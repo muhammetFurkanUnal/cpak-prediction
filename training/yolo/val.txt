@@ -1,0 +1,17 @@
+dataset/images/val/0.r.jpg
+dataset/images/val/22.r.jpg
+dataset/images/val/12.l.jpg
+dataset/images/val/3011.r.jpg
+dataset/images/val/2.l.jpg
+dataset/images/val/1.r_1009.jpg
+dataset/images/val/13.r.jpg
+dataset/images/val/3008.l.jpg
+dataset/images/val/11.r.jpg
+dataset/images/val/10.r_1069.jpg
+dataset/images/val/3005.r.jpg
+dataset/images/val/10.l_1001.jpg
+dataset/images/val/3001.r.jpg
+dataset/images/val/1.l_1095.jpg
+dataset/images/val/14.r_1171.jpg
+dataset/images/val/2.r.jpg
+dataset/images/val/18.l.jpg

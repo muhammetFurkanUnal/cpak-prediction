@@ -1,0 +1,8 @@
+kpt_shape:
+- 7
+- 3
+names:
+  0: cpak_keypoints
+path: .
+train: train.txt
+val: val.txt
