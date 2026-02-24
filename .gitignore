@@ -3,6 +3,7 @@ __pycache__
 datasets
 preprocessing/hospital-split-preop
 preprocessing/LERA-split-preop
-training/deeplabcut/cpak-furkan-2026-02-17
+training/deeplabcut/cpak-furkan-2026-02-20
 training/yolo/dataset
 training/yolo/runs
+preprocessing/preprocessed-dataset.zip
