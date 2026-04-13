@@ -1,0 +1,23 @@
+.venv
+__pycache__
+.claude
+
+
+cpak-furkan-2026-04-13
+
+data/*
+!data/.gitkeep
+
+preprocessing/*
+!preprocessing/methods.py
+!preprocessing/preprocess.ipynb
+
+training-datasets/
+dlc-models/
+dlc-models-pytorch/
+
+videos/*
+!videos/.gitkeep
+
+# config.yaml'daki project_path kullanıcıya özel; template kalsın
+# (opsiyonel: config.yaml'ı da ignore edip config.yaml.example kullanabilirsiniz)
