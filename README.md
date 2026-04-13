@@ -73,7 +73,7 @@ video_sets:
 
 Download the labeled image dataset from the link below and extract it:
 
-**[https://drive.google.com/drive/folders/1rDl57FmFnuq-J0RgA1oLiwDOGc5kTwX1](#)**  ← replace with actual link
+**[https://drive.google.com/drive/folders/1rDl57FmFnuq-J0RgA1oLiwDOGc5kTwX1](#)**
 
 Place the images in:
 
