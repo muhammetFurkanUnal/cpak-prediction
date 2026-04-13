@@ -124,6 +124,82 @@ In the GUI, go to the **"Evaluate Network"** tab and click **"Evaluate Network"*
 
 ---
 
+## Inference
+
+DeepLabCut is only used for training. Once training is complete, the model is exported to ONNX and all subsequent inference runs through custom code — no DeepLabCut dependency needed.
+
+### 1. Locate the training outputs
+
+After training, find these two files under the project folder:
+
+```
+cpak-furkan-<date>/dlc-models-pytorch/iteration-0/<shuffle>/train/
+  ├── pytorch_config.yaml   ← model architecture
+  └── snapshot-best-*.pt    ← trained weights
+```
+
+### 2. Export to ONNX
+
+Open `notebooks/export-model.ipynb` and set the paths at the top of the notebook:
+
+```python
+pytorch_config_path = "/absolute/path/to/.../train/pytorch_config.yaml"
+pt_path             = "/absolute/path/to/.../train/snapshot-best-*.pt"
+onnx_file_path      = "notebooks/out/models/model.onnx"
+```
+
+Run all cells. This produces a standalone `model.onnx` file that no longer requires DeepLabCut or PyTorch to run.
+
+### 3. Run inference
+
+Open `notebooks/inference.ipynb` and set:
+
+```python
+onnx_path         = "notebooks/out/models/model.onnx"
+input_folder_path = "/path/to/images/"
+output_path       = "notebooks/out/inference/"
+```
+
+Run all cells. Outputs written to `output_path`:
+
+| File | Contents |
+|---|---|
+| `inference_results.json` | Per-image joint coordinates (x, y, confidence) for all 27 keypoints |
+| `orthopedic_metrics.json` | Computed femur / tibia / ankle mechanical angles |
+| `*.jpg` | Input images with anatomical axes drawn on top |
+
+### 4. Test against ground truth
+
+Open `notebooks/test.ipynb` and set:
+
+```python
+truth_json_path     = "/path/to/ground_truth_angles.json"
+inference_json_path = "notebooks/out/inference/orthopedic_metrics.json"
+output_folder       = "notebooks/out/test/"
+```
+
+Ground truth JSON format:
+
+```json
+{
+  "4075.l": { "femur": "86.34", "tibia": "83.32" },
+  "4000.r": { "femur": "91.12", "tibia": "88.45" }
+}
+```
+
+Run all cells. Outputs written to `output_folder`:
+
+| File | Contents |
+|---|---|
+| `angles.csv` | Predicted vs. ground truth angles, per-image errors |
+| `metrics.json` | MAE, RMSE, R² for femur and tibia (axial and notch/intercondylar methods) |
+| `femur_comparison_graphs.png` | Regression plots and error distribution |
+| `tibia_comparison_graphs.png` | Regression plots and error distribution |
+| `distribution.json` | Sample counts grouped by error range (0–0.5°, 0.5–1.0°, …) |
+| `distribution_plot.png` | Bar chart of error distribution |
+
+---
+
 ## Project structure
 
 ```
@@ -131,6 +207,11 @@ cpak/
 ├── assets/
 │   ├── config.yaml                  # DLC project config template
 │   └── CollectedData_furkan.csv     # Landmark labels (188 frames × 27 keypoints)
+├── notebooks/
+│   ├── lib/inference.py             # Inference and metric computation library
+│   ├── export-model.ipynb           # Export trained .pt → .onnx
+│   ├── inference.ipynb              # Batch inference: images → coordinates + angles
+│   └── test.ipynb                   # Evaluate predictions against ground truth
 ├── scripts/
 │   └── csv_to_h5.py                 # Converts labels CSV → H5 (required by DLC)
 ├── preprocessing/
