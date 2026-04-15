@@ -5,6 +5,15 @@ __pycache__
 
 cpak-furkan-2026-04-13
 
+notebooks/out/inference/*
+!notebooks/out/inference/.gitkeep
+
+notebooks/out/test/*
+!notebooks/out/test/.gitkeep
+
+notebooks/out/models/*
+!notebooks/out/models/.gitkeep
+
 data/*
 !data/.gitkeep
 
