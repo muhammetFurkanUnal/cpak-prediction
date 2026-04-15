@@ -1,0 +1,6 @@
+fastapi>=0.111
+uvicorn[standard]
+onnxruntime          # GPU için: onnxruntime-gpu
+opencv-python-headless
+numpy
+python-multipart
