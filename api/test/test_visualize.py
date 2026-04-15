@@ -2,25 +2,29 @@
 """
 Test: POST /infer/{model_name}/visualize
 
-Saves the returned JPEG to /tmp/cpak_visualize.jpg so you can inspect it.
+Saves the returned JPEG to api/test/out/cpak_visualize.jpg so you can inspect it.
 
 Usage
 -----
-python3 api/test/test_visualize.py [base_url] [image_path] [model_name]
+python3 api/test/test_visualize.py <image_path> [model_name] [base_url]
 """
 
 import sys
 from pathlib import Path
 import requests
 
-BASE_URL   = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
-IMAGE_PATH = sys.argv[2] if len(sys.argv) > 2 else str(
-    Path(__file__).parent.parent.parent / "data/samples-img/split-postop/4024.r.jpg"
-)
-OUT_PATH   = "/tmp/cpak_visualize.jpg"
+if len(sys.argv) < 2:
+    print("Usage: python3 api/test/test_visualize.py <image_path> [model_name] [base_url]")
+    sys.exit(1)
 
-if len(sys.argv) > 3:
-    MODEL = sys.argv[3]
+IMAGE_PATH = sys.argv[1]
+BASE_URL   = sys.argv[3] if len(sys.argv) > 3 else "http://localhost:8000"
+OUT_DIR    = Path(__file__).parent / "out"
+OUT_DIR.mkdir(exist_ok=True)
+OUT_PATH   = str(OUT_DIR / "cpak_visualize.jpg")
+
+if len(sys.argv) > 2:
+    MODEL = sys.argv[2]
 else:
     MODEL = requests.get(f"{BASE_URL}/models").json()["models"][0]
 

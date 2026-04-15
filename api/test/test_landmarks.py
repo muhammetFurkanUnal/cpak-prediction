@@ -2,7 +2,7 @@
 """
 Test: POST /infer/{model_name}/landmarks
 
-Saves the returned JPEG to /tmp/cpak_landmarks.jpg so you can inspect it.
+Saves the returned JPEG to api/test/out/cpak_landmarks.jpg so you can inspect it.
 
 Usage
 -----
@@ -17,7 +17,9 @@ BASE_URL   = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 IMAGE_PATH = sys.argv[2] if len(sys.argv) > 2 else str(
     Path(__file__).parent.parent.parent / "data/samples-img/split-postop/4024.r.jpg"
 )
-OUT_PATH   = "/tmp/cpak_landmarks.jpg"
+OUT_DIR  = Path(__file__).parent / "out"
+OUT_DIR.mkdir(exist_ok=True)
+OUT_PATH = str(OUT_DIR / "cpak_landmarks.jpg")
 
 if len(sys.argv) > 3:
     MODEL = sys.argv[3]
