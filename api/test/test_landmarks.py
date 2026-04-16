@@ -19,7 +19,7 @@ IMAGE_PATH = sys.argv[2] if len(sys.argv) > 2 else str(
 )
 OUT_DIR  = Path(__file__).parent / "out"
 OUT_DIR.mkdir(exist_ok=True)
-OUT_PATH = str(OUT_DIR / "cpak_landmarks.jpg")
+OUT_PATH = str(OUT_DIR / "cpak_landmarks.png")
 
 if len(sys.argv) > 3:
     MODEL = sys.argv[3]
@@ -41,7 +41,7 @@ print(f"Status       : {resp.status_code}")
 print(f"Content-Type : {resp.headers.get('content-type')}")
 
 assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
-assert "image/jpeg" in resp.headers.get("content-type", ""), "Expected JPEG response"
+assert "image/png" in resp.headers.get("content-type", ""), "Expected PNG response"
 assert len(resp.content) > 0, "Empty image body"
 
 with open(OUT_PATH, "wb") as f:

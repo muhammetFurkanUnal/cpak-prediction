@@ -114,7 +114,7 @@ def main():
     if resp.status_code != 200:
         sys.exit(f"Visualize failed ({resp.status_code}): {resp.text}")
 
-    vis_path = out_dir / f"{stem}_visualize.jpg"
+    vis_path = out_dir / f"{stem}_visualize.png"
     vis_path.write_bytes(resp.content)
     print(f"Saved  : {vis_path}")
 
@@ -124,7 +124,7 @@ def main():
     if resp.status_code != 200:
         sys.exit(f"Landmarks failed ({resp.status_code}): {resp.text}")
 
-    lm_path = out_dir / f"{stem}_landmarks.jpg"
+    lm_path = out_dir / f"{stem}_landmarks.png"
     lm_path.write_bytes(resp.content)
     print(f"Saved  : {lm_path}")
 

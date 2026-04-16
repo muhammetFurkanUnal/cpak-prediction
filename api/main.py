@@ -21,7 +21,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from api.model_registry import get_session, list_models
 from api.schemas import InferenceResponse, Keypoint, OrthopedicAngles
@@ -38,6 +40,16 @@ app = FastAPI(
     description="Ortopedik landmark tespiti ve mekanik açı hesaplama.",
     version="0.1.0",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_FRONTEND = Path(__file__).parent / "frontend"
+app.mount("/static", StaticFiles(directory=str(_FRONTEND)), name="static")
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +86,11 @@ def _build_response(model_name: str, coords, metrics_raw) -> InferenceResponse:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+def root():
+    return FileResponse(str(_FRONTEND / "index.html"))
+
 
 @app.get("/health")
 def health():
@@ -121,8 +138,8 @@ async def infer_visualize(model_name: str, image: UploadFile = File(...)):
     metrics_raw = compute_orthopedic_metrics(coords)
 
     annotated = draw_lines(img, metrics_raw, coords)
-    _, buffer = cv2.imencode(".jpg", annotated)
-    return Response(content=buffer.tobytes(), media_type="image/jpeg")
+    _, buffer = cv2.imencode(".png", annotated)
+    return Response(content=buffer.tobytes(), media_type="image/png")
 
 
 @app.post("/infer/{model_name}/landmarks")
@@ -141,5 +158,5 @@ async def infer_landmarks(model_name: str, image: UploadFile = File(...)):
     coords = extract_coordinates(heatmap, offset)
 
     annotated = visualize_predictions(img, coords, threshold=0.0)
-    _, buffer = cv2.imencode(".jpg", annotated)
-    return Response(content=buffer.tobytes(), media_type="image/jpeg")
+    _, buffer = cv2.imencode(".png", annotated)
+    return Response(content=buffer.tobytes(), media_type="image/png")

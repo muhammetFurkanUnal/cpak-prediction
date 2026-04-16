@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cpak — Orthopedic Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #070d1a;
+      --surface: #0d1628;
+      --card:    #111d33;
+      --border:  #1e2f4d;
+      --accent:  #22d3ee;
+      --accent2: #818cf8;
+      --success: #34d399;
+      --warn:    #fbbf24;
+      --danger:  #f87171;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --radius:  12px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px);
+    }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    .logo svg { color: var(--accent); }
+    .logo span { color: var(--accent); }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 999px;
+      background: color-mix(in srgb, var(--success) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+      color: var(--success); transition: all .3s;
+    }
+    .status-pill.offline {
+      background: color-mix(in srgb, var(--danger) 15%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+      color: var(--danger);
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    main { flex: 1; padding: 28px; max-width: 1400px; margin: 0 auto; width: 100%; }
+
+    .top-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; margin-bottom: 28px; }
+    @media (max-width: 900px) { .top-grid { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
+
+    /* Upload */
+    .upload-zone {
+      position: relative; border: 2px dashed var(--border); border-radius: var(--radius);
+      min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; cursor: pointer; transition: border-color .2s, background .2s; overflow: hidden;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-icon { color: var(--muted); transition: color .2s; }
+    .upload-zone:hover .upload-icon { color: var(--accent); }
+    .upload-hint { color: var(--muted); font-size: 13px; text-align: center; }
+    .upload-hint strong { color: var(--text); }
+    #preview-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: none; }
+    #preview-img.visible { display: block; }
+    .preview-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.8) 0%, transparent 50%); display: none; align-items: flex-end; padding: 14px; pointer-events: none; }
+    #preview-img.visible ~ .preview-overlay { display: flex; }
+    .preview-name { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+    /* Controls */
+    .control-panel { display: flex; flex-direction: column; gap: 16px; }
+    label.field-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+    select {
+      width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 9px 12px; font-size: 13px; font-family: 'Inter', sans-serif;
+      cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; transition: border-color .2s;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; font-family: 'Inter', sans-serif; transition: all .2s; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, white); transform: translateY(-1px); box-shadow: 0 4px 20px color-mix(in srgb, var(--accent) 40%, transparent); }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(0,0,0,.3); border-top-color: #000; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Metrics */
+    .metrics-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; opacity: 0; transform: translateY(8px); transition: opacity .4s, transform .4s; }
+    .metrics-grid.visible { opacity: 1; transform: translateY(0); }
+    @media (max-width: 800px) { .metrics-grid { grid-template-columns: repeat(2,1fr); } }
+    .metric-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; position: relative; overflow: hidden; }
+    .metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .metric-card.femur-ax::before { background: var(--accent); }
+    .metric-card.femur-n::before  { background: var(--accent2); }
+    .metric-card.tibia-ax::before { background: var(--success); }
+    .metric-card.tibia-in::before { background: var(--warn); }
+    .metric-bone   { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 4px; }
+    .metric-method { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .metric-value  { font-size: 36px; font-weight: 700; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+    .metric-card.femur-ax .metric-value { color: var(--accent); }
+    .metric-card.femur-n  .metric-value { color: var(--accent2); }
+    .metric-card.tibia-ax .metric-value { color: var(--success); }
+    .metric-card.tibia-in .metric-value { color: var(--warn); }
+    .metric-unit { font-size: 18px; font-weight: 400; opacity: .6; }
+
+    /* Results grid */
+    .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; opacity: 0; transform: translateY(8px); transition: opacity .4s .1s, transform .4s .1s; }
+    .results-grid.visible { opacity: 1; transform: translateY(0); }
+    @media (max-width: 700px) { .results-grid { grid-template-columns: 1fr; } }
+
+    .result-img-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .result-img-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .result-img-title { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .result-badge { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; }
+    .badge-vis { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+    .badge-lm  { background: color-mix(in srgb, var(--accent2) 15%, transparent); color: var(--accent2); }
+
+    .header-actions { display: flex; align-items: center; gap: 4px; }
+    .icon-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 6px; border: none;
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: color .15s, background .15s;
+    }
+    .icon-btn:hover { color: var(--text); background: var(--border); }
+
+    /* ── Image Viewer ────────────────────────────────────────────── */
+    .viewer-container {
+      position: relative;
+      background: #000;
+      min-height: 320px;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+    }
+    .viewer-container.dragging { cursor: grabbing; }
+    .viewer-container.has-image { min-height: 0; }
+
+    .viewer-canvas {
+      /* the img inside gets absolute positioning + transform */
+      position: relative;
+      width: 100%; height: 100%;
+    }
+
+    .viewer-img {
+      position: absolute;
+      top: 0; left: 0;
+      transform-origin: 0 0;
+      display: block;
+      max-width: none;
+      pointer-events: none;
+      /* preserve full sharpness at all zoom levels */
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+
+    /* Floating toolbar — bottom-right of viewer */
+    .viewer-toolbar {
+      position: absolute;
+      bottom: 10px; right: 10px;
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(7, 13, 26, .85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+      z-index: 10;
+      opacity: 0; transition: opacity .2s;
+    }
+    .viewer-container:hover .viewer-toolbar,
+    .viewer-container:fullscreen .viewer-toolbar { opacity: 1; }
+
+    .viewer-toolbar .icon-btn { width: 26px; height: 26px; border-radius: 5px; }
+
+    /* Zoom level badge */
+    .zoom-badge {
+      position: absolute;
+      bottom: 10px; left: 10px;
+      font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      color: rgba(255,255,255,.5);
+      background: rgba(7,13,26,.7);
+      border: 1px solid var(--border);
+      padding: 2px 8px; border-radius: 5px;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0; transition: opacity .2s;
+    }
+    .viewer-container:hover .zoom-badge { opacity: 1; }
+
+    /* Separator in toolbar */
+    .toolbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+
+    /* Placeholder */
+    .img-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--muted); position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+    .img-placeholder span { font-size: 12px; }
+
+    /* Loading */
+    .img-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+    .img-spinner { width: 32px; height: 32px; border: 3px solid rgba(255,255,255,.1); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+
+    /* ── Fullscreen overrides ──────────────────────────────────────── */
+    .viewer-container:fullscreen,
+    .viewer-container:-webkit-full-screen,
+    .viewer-container:-moz-full-screen {
+      background: #000;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      cursor: grab;
+    }
+    .viewer-container:fullscreen.dragging,
+    .viewer-container:-webkit-full-screen.dragging {
+      cursor: grabbing;
+    }
+    .viewer-container:fullscreen .viewer-toolbar,
+    .viewer-container:-webkit-full-screen .viewer-toolbar {
+      opacity: 1;
+      bottom: 20px; right: 20px;
+    }
+    .viewer-container:fullscreen .zoom-badge,
+    .viewer-container:-webkit-full-screen .zoom-badge {
+      opacity: 1;
+      bottom: 20px; left: 20px;
+    }
+
+    /* Keypoints */
+    .keypoints-section { opacity: 0; transform: translateY(8px); transition: opacity .4s .2s, transform .4s .2s; }
+    .keypoints-section.visible { opacity: 1; transform: translateY(0); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .kp-count { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--border); color: var(--muted); }
+    .table-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { background: var(--surface); padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--border); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface); }
+    tbody td { padding: 8px 14px; font-family: 'JetBrains Mono', monospace; }
+    .td-id { color: var(--muted); width: 50px; }
+    .conf-bar { display: flex; align-items: center; gap: 8px; }
+    .conf-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .conf-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+    .conf-num { color: var(--muted); min-width: 46px; text-align: right; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: color-mix(in srgb, var(--danger) 15%, var(--card)); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); padding: 12px 18px; border-radius: var(--radius); font-size: 13px; max-width: 360px; transform: translateY(80px); opacity: 0; transition: all .3s; pointer-events: none; z-index: 999; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    .download-btn { font-size: 11px; font-weight: 500; color: var(--muted); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; transition: color .2s, background .2s; }
+    .download-btn:hover { color: var(--text); background: var(--border); }
+
+    .divider { height: 1px; background: var(--border); margin: 28px 0; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/>
+      </svg>
+      cpak <span>analysis</span>
+    </div>
+    <div id="status-pill" class="status-pill offline">
+      <div class="status-dot"></div>
+      <span id="status-text">connecting…</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="top-grid">
+      <div class="card">
+        <div class="card-title">X-Ray Image</div>
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="file-input" accept="image/*" />
+          <img id="preview-img" alt="preview" />
+          <div class="preview-overlay">
+            <span class="preview-name" id="preview-name"></span>
+          </div>
+          <div id="upload-placeholder">
+            <svg class="upload-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <div class="upload-hint"><strong>Click to upload</strong> or drag & drop<br/>JPEG, PNG, BMP supported</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card control-panel">
+        <div class="card-title">Settings</div>
+        <div>
+          <label class="field-label" for="model-select">Model</label>
+          <select id="model-select"><option value="">Loading models…</option></select>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn btn-primary" id="run-btn" disabled>
+          <div class="spinner" id="btn-spinner"></div>
+          <svg id="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="btn-label">Run Inference</span>
+        </button>
+        <button class="btn btn-ghost" id="clear-btn">Clear</button>
+        <div id="model-info" style="display:none; padding:10px; background:var(--surface); border-radius:8px; border:1px solid var(--border);">
+          <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Active Model</div>
+          <div id="model-name-display" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent);"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="results-section" style="display:none;">
+      <div class="card-title" style="margin-bottom:14px;">Orthopedic Metrics</div>
+      <div class="metrics-grid" id="metrics-grid">
+        <div class="metric-card femur-ax"><div class="metric-bone">Femur</div><div class="metric-method">Axial Middle</div><div class="metric-value" id="m-femur-ax">—<span class="metric-unit">°</span></div></div>
+        <div class="metric-card femur-n"><div class="metric-bone">Femur</div><div class="metric-method">Notch</div><div class="metric-value" id="m-femur-n">—<span class="metric-unit">°</span></div></div>
+        <div class="metric-card tibia-ax"><div class="metric-bone">Tibia</div><div class="metric-method">Axial Middle</div><div class="metric-value" id="m-tibia-ax">—<span class="metric-unit">°</span></div></div>
+        <div class="metric-card tibia-in"><div class="metric-bone">Tibia</div><div class="metric-method">Intercondylar</div><div class="metric-value" id="m-tibia-in">—<span class="metric-unit">°</span></div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="card-title" style="margin-bottom:14px;">Inference Output</div>
+
+      <div class="results-grid" id="results-grid">
+        <!-- Visualize card -->
+        <div class="result-img-card">
+          <div class="result-img-header">
+            <div class="result-img-title">
+              <span>Mechanical Axes</span>
+              <span class="result-badge badge-vis">visualize</span>
+            </div>
+            <div class="header-actions">
+              <button class="download-btn" id="dl-vis" style="display:none;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+          <div class="viewer-container" id="vis-wrap">
+            <div class="img-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Run inference to see results</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Landmarks card -->
+        <div class="result-img-card">
+          <div class="result-img-header">
+            <div class="result-img-title">
+              <span>Landmark Points</span>
+              <span class="result-badge badge-lm">landmarks</span>
+            </div>
+            <div class="header-actions">
+              <button class="download-btn" id="dl-lm" style="display:none;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Download
+              </button>
+            </div>
+          </div>
+          <div class="viewer-container" id="lm-wrap">
+            <div class="img-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Run inference to see results</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="keypoints-section" id="kp-section">
+        <div class="section-header">
+          <div class="section-title">Keypoints <span class="kp-count" id="kp-count">27</span></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>X</th><th>Y</th><th>Confidence</th></tr></thead>
+            <tbody id="kp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let selectedFile = null;
+let visBlob = null;
+let lmBlob  = null;
+
+// ── DOM ────────────────────────────────────────────────────────────────────
+const uploadZone     = document.getElementById('upload-zone');
+const fileInput      = document.getElementById('file-input');
+const previewImg     = document.getElementById('preview-img');
+const previewName    = document.getElementById('preview-name');
+const uploadPh       = document.getElementById('upload-placeholder');
+const modelSelect    = document.getElementById('model-select');
+const runBtn         = document.getElementById('run-btn');
+const clearBtn       = document.getElementById('clear-btn');
+const btnSpinner     = document.getElementById('btn-spinner');
+const btnIcon        = document.getElementById('btn-icon');
+const btnLabel       = document.getElementById('btn-label');
+const statusPill     = document.getElementById('status-pill');
+const statusText     = document.getElementById('status-text');
+const resultsSection = document.getElementById('results-section');
+const metricsGrid    = document.getElementById('metrics-grid');
+const resultsGrid    = document.getElementById('results-grid');
+const kpSection      = document.getElementById('kp-section');
+const kpTbody        = document.getElementById('kp-tbody');
+const visWrap        = document.getElementById('vis-wrap');
+const lmWrap         = document.getElementById('lm-wrap');
+const dlVis          = document.getElementById('dl-vis');
+const dlLm           = document.getElementById('dl-lm');
+const modelInfo      = document.getElementById('model-info');
+const modelNameDisp  = document.getElementById('model-name-display');
+const toast          = document.getElementById('toast');
+
+// ── ImageViewer ────────────────────────────────────────────────────────────
+// Adds zoom (scroll), pan (drag), double-click reset, and fullscreen to a
+// .viewer-container element.
+class ImageViewer {
+  constructor(container) {
+    this.container = container;
+    this.img       = null;   // the <img> element, set when image is loaded
+    this.scale     = 1;
+    this.tx        = 0;      // translateX
+    this.ty        = 0;      // translateY
+    this.dragging  = false;
+    this.lastX     = 0;
+    this.lastY     = 0;
+    this.MIN_SCALE = 0.1;
+    this.MAX_SCALE = 20;
+
+    // toolbar & badge created in mountImage
+    this.toolbar   = null;
+    this.zoomBadge = null;
+  }
+
+  // Called after img is inserted into container
+  mountImage(img) {
+    this.img = img;
+
+    // Fit image to container once loaded
+    if (img.complete && img.naturalWidth) {
+      this._fitToContainer();
+    } else {
+      img.onload = () => this._fitToContainer();
+    }
+
+    this._buildToolbar();
+    this._buildZoomBadge();
+    this._attachEvents();
+  }
+
+  _fitToContainer() {
+    const cw = this.container.clientWidth  || 600;
+    const ch = this.container.clientHeight || 400;
+    const iw = this.img.naturalWidth;
+    const ih = this.img.naturalHeight;
+
+    const scaleX = cw / iw;
+    const scaleY = ch / ih;
+    this.scale   = Math.min(scaleX, scaleY, 1);  // never upscale initially
+    this.tx      = (cw - iw * this.scale) / 2;
+    this.ty      = (ch - ih * this.scale) / 2;
+
+    // Make container tall enough to show the whole image at fit scale
+    this.container.style.height = `${Math.max(320, ih * this.scale)}px`;
+
+    this._applyTransform();
+    this._updateBadge();
+  }
+
+  _buildToolbar() {
+    this.toolbar = document.createElement('div');
+    this.toolbar.className = 'viewer-toolbar';
+    this.toolbar.innerHTML = `
+      <button class="icon-btn" data-action="zoom-in"  title="Zoom in">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="icon-btn" data-action="zoom-out" title="Zoom out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="icon-btn" data-action="reset"    title="Reset view (double-click)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <div class="toolbar-sep"></div>
+      <button class="icon-btn" data-action="fullscreen" title="Fullscreen">
+        <svg class="icon-enter-fs" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        <svg class="icon-exit-fs"  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+      </button>
+    `;
+
+    this.toolbar.addEventListener('mousedown', e => e.stopPropagation());
+    this.toolbar.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const cx = this.container.clientWidth  / 2;
+      const cy = this.container.clientHeight / 2;
+      switch (btn.dataset.action) {
+        case 'zoom-in':    this._zoom(1.25, cx, cy); break;
+        case 'zoom-out':   this._zoom(0.8,  cx, cy); break;
+        case 'reset':      this._fitToContainer(); break;
+        case 'fullscreen': this._toggleFullscreen(); break;
+      }
+    });
+
+    this.container.appendChild(this.toolbar);
+
+    // Update fullscreen icons when state changes
+    document.addEventListener('fullscreenchange', () => this._syncFsIcons());
+    document.addEventListener('webkitfullscreenchange', () => this._syncFsIcons());
+  }
+
+  _buildZoomBadge() {
+    this.zoomBadge = document.createElement('div');
+    this.zoomBadge.className = 'zoom-badge';
+    this.container.appendChild(this.zoomBadge);
+  }
+
+  _attachEvents() {
+    const c = this.container;
+
+    // Wheel → zoom around cursor
+    c.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect   = c.getBoundingClientRect();
+      const cx     = e.clientX - rect.left;
+      const cy     = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      this._zoom(factor, cx, cy);
+    }, { passive: false });
+
+    // Mouse drag → pan
+    c.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      this.dragging = true;
+      this.lastX = e.clientX;
+      this.lastY = e.clientY;
+      c.classList.add('dragging');
+    });
+    window.addEventListener('mousemove', e => {
+      if (!this.dragging) return;
+      this.tx += e.clientX - this.lastX;
+      this.ty += e.clientY - this.lastY;
+      this.lastX = e.clientX;
+      this.lastY = e.clientY;
+      this._applyTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      if (!this.dragging) return;
+      this.dragging = false;
+      c.classList.remove('dragging');
+    });
+
+    // Touch – single finger pan, two-finger pinch zoom
+    let lastTouches = null;
+    c.addEventListener('touchstart', e => {
+      lastTouches = e.touches;
+    }, { passive: true });
+    c.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (e.touches.length === 1 && lastTouches?.length === 1) {
+        this.tx += e.touches[0].clientX - lastTouches[0].clientX;
+        this.ty += e.touches[0].clientY - lastTouches[0].clientY;
+        this._applyTransform();
+      } else if (e.touches.length === 2 && lastTouches?.length === 2) {
+        const prevDist = Math.hypot(lastTouches[0].clientX - lastTouches[1].clientX, lastTouches[0].clientY - lastTouches[1].clientY);
+        const currDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const rect = c.getBoundingClientRect();
+        const cx = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+        const cy = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
+        this._zoom(currDist / prevDist, cx, cy);
+      }
+      lastTouches = e.touches;
+    }, { passive: false });
+    c.addEventListener('touchend', () => { lastTouches = null; }, { passive: true });
+
+    // Double-click → reset
+    c.addEventListener('dblclick', () => this._fitToContainer());
+  }
+
+  _zoom(factor, cx, cy) {
+    const newScale = Math.min(this.MAX_SCALE, Math.max(this.MIN_SCALE, this.scale * factor));
+    const ratio    = newScale / this.scale;
+    this.tx    = cx - (cx - this.tx) * ratio;
+    this.ty    = cy - (cy - this.ty) * ratio;
+    this.scale = newScale;
+    this._applyTransform();
+    this._updateBadge();
+  }
+
+  _applyTransform() {
+    if (!this.img) return;
+    this.img.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`;
+  }
+
+  _updateBadge() {
+    if (this.zoomBadge) {
+      this.zoomBadge.textContent = `${Math.round(this.scale * 100)}%`;
+    }
+  }
+
+  _toggleFullscreen() {
+    const c = this.container;
+    if (!document.fullscreenElement) {
+      (c.requestFullscreen || c.webkitRequestFullscreen || c.mozRequestFullScreen).call(c)
+        .then(() => {
+          // Re-fit image inside fullscreen dimensions
+          setTimeout(() => this._fitToContainer(), 50);
+        }).catch(() => {});
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document);
+    }
+  }
+
+  _syncFsIcons() {
+    if (!this.toolbar) return;
+    const inside = document.fullscreenElement === this.container;
+    this.toolbar.querySelector('.icon-enter-fs').style.display = inside ? 'none'  : '';
+    this.toolbar.querySelector('.icon-exit-fs').style.display  = inside ? ''      : 'none';
+    if (inside) setTimeout(() => this._fitToContainer(), 50);
+  }
+}
+
+// ── Health ─────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    if (r.ok) { statusPill.classList.remove('offline'); statusText.textContent = 'server online'; }
+    else throw new Error();
+  } catch {
+    statusPill.classList.add('offline'); statusText.textContent = 'server offline';
+  }
+}
+
+// ── Models ─────────────────────────────────────────────────────────────────
+async function loadModels() {
+  try {
+    const data = await (await fetch(`${API}/models`)).json();
+    modelSelect.innerHTML = data.models.length
+      ? data.models.map(m => `<option value="${m}">${m}</option>`).join('')
+      : '<option value="">No models found</option>';
+    updateRunBtn();
+  } catch {
+    modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+  }
+}
+
+// ── File upload ────────────────────────────────────────────────────────────
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) { showToast('Please select a valid image file.'); return; }
+  selectedFile = file;
+  previewImg.src = URL.createObjectURL(file);
+  previewImg.classList.add('visible');
+  uploadPh.style.display = 'none';
+  previewName.textContent = file.name;
+  updateRunBtn();
+}
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+
+// ── Clear ──────────────────────────────────────────────────────────────────
+clearBtn.addEventListener('click', () => {
+  selectedFile = null; fileInput.value = '';
+  previewImg.src = ''; previewImg.classList.remove('visible');
+  uploadPh.style.display = ''; previewName.textContent = '';
+  resultsSection.style.display = 'none';
+  metricsGrid.classList.remove('visible');
+  resultsGrid.classList.remove('visible');
+  kpSection.classList.remove('visible');
+  visBlob = lmBlob = null;
+  updateRunBtn();
+});
+
+// ── Run state ──────────────────────────────────────────────────────────────
+function updateRunBtn() { runBtn.disabled = !selectedFile || !modelSelect.value; }
+modelSelect.addEventListener('change', () => {
+  updateRunBtn();
+  if (modelSelect.value) { modelInfo.style.display = 'block'; modelNameDisp.textContent = modelSelect.value; }
+});
+
+// ── Inference ──────────────────────────────────────────────────────────────
+runBtn.addEventListener('click', runInference);
+
+async function runInference() {
+  if (!selectedFile || !modelSelect.value) return;
+  const model = modelSelect.value;
+  setLoading(true);
+  resultsSection.style.display = 'block';
+  showImgLoading(visWrap);
+  showImgLoading(lmWrap);
+
+  try {
+    const [jsonResp, visResp, lmResp] = await Promise.all([
+      postImage(`${API}/infer/${model}`,           selectedFile),
+      postImage(`${API}/infer/${model}/visualize`, selectedFile),
+      postImage(`${API}/infer/${model}/landmarks`, selectedFile),
+    ]);
+    if (!jsonResp.ok) throw new Error(await jsonResp.text());
+    if (!visResp.ok)  throw new Error(await visResp.text());
+    if (!lmResp.ok)   throw new Error(await lmResp.text());
+
+    const data = await jsonResp.json();
+    visBlob = await visResp.blob();
+    lmBlob  = await lmResp.blob();
+
+    renderMetrics(data.metrics);
+    renderImages(visBlob, lmBlob, selectedFile.name);
+    renderKeypoints(data.keypoints);
+
+    requestAnimationFrame(() => {
+      metricsGrid.classList.add('visible');
+      resultsGrid.classList.add('visible');
+      kpSection.classList.add('visible');
+    });
+  } catch (err) {
+    showToast('Inference failed: ' + err.message);
+    clearImgLoading(visWrap);
+    clearImgLoading(lmWrap);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function postImage(url, file) {
+  const fd = new FormData();
+  fd.append('image', file);
+  return fetch(url, { method: 'POST', body: fd });
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderMetrics(m) {
+  document.getElementById('m-femur-ax').innerHTML = m.femur_mech_angle_ax_middle.toFixed(2) + '<span class="metric-unit">°</span>';
+  document.getElementById('m-femur-n').innerHTML  = m.femur_mech_angle_notch.toFixed(2)      + '<span class="metric-unit">°</span>';
+  document.getElementById('m-tibia-ax').innerHTML = m.tibia_mech_angle_ax_middle.toFixed(2)  + '<span class="metric-unit">°</span>';
+  document.getElementById('m-tibia-in').innerHTML = m.tibia_mech_angle_inter.toFixed(2)      + '<span class="metric-unit">°</span>';
+}
+
+function renderImages(visB, lmB, filename) {
+  const stem = filename.replace(/\.[^.]+$/, '');
+  mountViewer(visWrap, URL.createObjectURL(visB));
+  mountViewer(lmWrap,  URL.createObjectURL(lmB));
+  dlVis.style.display = '';
+  dlLm.style.display  = '';
+  dlVis.onclick = () => downloadBlob(visB, `${stem}_visualize.png`);
+  dlLm.onclick  = () => downloadBlob(lmB,  `${stem}_landmarks.png`);
+}
+
+function mountViewer(container, imgUrl) {
+  // Clear previous content (keep nothing)
+  container.innerHTML = '';
+  container.classList.add('has-image');
+
+  const img = document.createElement('img');
+  img.className = 'viewer-img';
+  img.src = imgUrl;
+  container.appendChild(img);
+
+  const viewer = new ImageViewer(container);
+  viewer.mountImage(img);
+}
+
+function renderKeypoints(kps) {
+  document.getElementById('kp-count').textContent = kps.length;
+  kpTbody.innerHTML = kps.map(kp => {
+    const pct = Math.min(100, kp.confidence * 100).toFixed(0);
+    return `<tr>
+      <td class="td-id">${kp.joint_id}</td>
+      <td>${kp.x.toFixed(2)}</td>
+      <td>${kp.y.toFixed(2)}</td>
+      <td>
+        <div class="conf-bar">
+          <div class="conf-track"><div class="conf-fill" style="width:${pct}%"></div></div>
+          <span class="conf-num">${kp.confidence.toFixed(4)}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function showImgLoading(wrap) {
+  wrap.innerHTML = `<div class="img-loading"><div class="img-spinner"></div></div>`;
+}
+function clearImgLoading(wrap) {
+  wrap.innerHTML = `<div class="img-placeholder"><span>Failed to load</span></div>`;
+}
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name; a.click();
+}
+
+// ── Loading ────────────────────────────────────────────────────────────────
+function setLoading(on) {
+  runBtn.disabled = on;
+  btnSpinner.style.display = on ? 'block' : 'none';
+  btnIcon.style.display    = on ? 'none'  : 'block';
+  btnLabel.textContent     = on ? 'Running…' : 'Run Inference';
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+checkHealth();
+loadModels();
+setInterval(checkHealth, 10000);
+</script>
+</body>
+</html>

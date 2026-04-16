@@ -4,3 +4,4 @@ onnxruntime          # GPU için: onnxruntime-gpu
 opencv-python-headless
 numpy
 python-multipart
+aiofiles             # StaticFiles için gerekli
