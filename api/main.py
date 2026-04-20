@@ -75,9 +75,7 @@ def _build_response(model_name: str, coords, metrics_raw) -> InferenceResponse:
         model=model_name,
         keypoints=keypoints,
         metrics=OrthopedicAngles(
-            femur_mech_angle_ax_middle=metrics_raw["femur_mech_angle_ax_middle"],
             femur_mech_angle_notch=metrics_raw["femur_mech_angle_notch"],
-            tibia_mech_angle_ax_middle=metrics_raw["tibia_mech_angle_ax_middle"],
             tibia_mech_angle_inter=metrics_raw["tibia_mech_angle_inter"],
         ),
     )

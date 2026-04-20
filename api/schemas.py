@@ -14,10 +14,8 @@ class Keypoint(BaseModel):
 
 
 class OrthopedicAngles(BaseModel):
-    femur_mech_angle_ax_middle: float
-    femur_mech_angle_notch: float
-    tibia_mech_angle_ax_middle: float
-    tibia_mech_angle_inter: float
+    femur_mech_angle_notch: float   # LDFA
+    tibia_mech_angle_inter: float   # MPTA
 
 
 class InferenceResponse(BaseModel):

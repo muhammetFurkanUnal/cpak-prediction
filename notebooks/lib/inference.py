@@ -133,17 +133,13 @@ def compute_orthopedic_metrics(coords: List[Point]) -> OrthopedicMetrics:
     final_ankle_middle = ((ankle_ax_middle[0] + ankle_model_middle[0]) / 2.0, (ankle_ax_middle[1] + ankle_model_middle[1]) / 2.0)
 
     # femur angles
-    femur_mech_vec_ax_middle = (femur_ax_middle[0] - femur_head[0], femur_ax_middle[1] - femur_head[1])
     femur_mech_vec_notch = (femur_notch[0] - femur_head[0], femur_notch[1] - femur_head[1])
     femur_joint_vec = (femur_medial[0] - femur_lateral[0], femur_medial[1] - femur_lateral[1])
     femur_mech_angle_notch = calculate_vector_angle(femur_mech_vec_notch, femur_joint_vec)
-    femur_mech_angle_ax_middle = calculate_vector_angle(femur_mech_vec_ax_middle, femur_joint_vec)
 
     # tibia angles
-    tibia_mech_vec_ax_middle = (tibia_ax_middle[0] - final_ankle_middle[0], tibia_ax_middle[1] - final_ankle_middle[1])
     tibia_mech_vec_inter = (tibia_intercondiler[0] - final_ankle_middle[0], tibia_intercondiler[1] - final_ankle_middle[1])
     tibia_joint_vec = (tibia_medial[0] - tibia_lateral[0], tibia_medial[1] - tibia_lateral[1])
-    tibia_mech_angle_ax_middle = calculate_vector_angle(tibia_mech_vec_ax_middle, tibia_joint_vec)
     tibia_mech_angle_inter = calculate_vector_angle(tibia_mech_vec_inter, tibia_joint_vec)
 
     return {
@@ -153,25 +149,18 @@ def compute_orthopedic_metrics(coords: List[Point]) -> OrthopedicMetrics:
         # femur joint
         "femur_lateral": femur_lateral,
         "femur_medial": femur_medial,
-        "femur_ax_middle": femur_ax_middle,
         "femur_notch": femur_notch,
         # tibia joint
         "tibia_lateral": tibia_lateral,
         "tibia_medial": tibia_medial,
-        "tibia_ax_middle": tibia_ax_middle,
         "tibia_intercondiler": tibia_intercondiler,
         # ankle
         "ankle_lateral": ankle_lateral,
         "ankle_medial": ankle_medial,
-        "ankle_ax_middle": ankle_ax_middle,
-        "ankle_model_middle": ankle_model_middle,
         "final_ankle_middle": final_ankle_middle,
         # angles
         "femur_mech_angle_notch": femur_mech_angle_notch,
-        "femur_mech_angle_ax_middle": femur_mech_angle_ax_middle,
-        "tibia_mech_angle_ax_middle": tibia_mech_angle_ax_middle,
-        "tibia_mech_angle_inter": tibia_mech_angle_inter
-
+        "tibia_mech_angle_inter": tibia_mech_angle_inter,
     }
 
 
@@ -193,47 +182,37 @@ def draw_lines(image, metrics: OrthopedicMetrics, coords: List[Point]):
     # femur head
     draw_pt(metrics["femur_head"], (0, 255, 0))
     draw_pt(metrics["multi_center"], (255, 0, 0))
-    draw_pt(coords[7], (0, 0, 255))
 
     # femur joint
     draw_pt(metrics["femur_lateral"], (0, 0, 255))
     draw_pt(metrics["femur_medial"], (0, 0, 255))
     draw_ln(metrics["femur_lateral"], metrics["femur_medial"], (0, 255, 0))
-    draw_pt(metrics["femur_ax_middle"], (255, 0, 0))
-    draw_pt(coords[10], (0, 0, 255))
+    draw_pt(metrics["femur_notch"], (255, 0, 0))
 
     # tibia joint
     draw_pt(metrics["tibia_lateral"], (0, 0, 255))
     draw_pt(metrics["tibia_medial"], (0, 0, 255))
     draw_ln(metrics["tibia_lateral"], metrics["tibia_medial"], (0, 255, 0))
-    draw_pt(metrics["tibia_ax_middle"], (255, 0, 0))
     draw_pt(metrics["tibia_intercondiler"], (255, 0, 0))
 
     # ankle
     draw_pt(metrics["ankle_lateral"], (0, 0, 255))
     draw_pt(metrics["ankle_medial"], (0, 0, 255))
-    draw_ln(metrics["ankle_lateral"], metrics["ankle_medial"], (0, 255, 0))
-    draw_pt(metrics["ankle_ax_middle"], (255, 0, 0))
     draw_pt(metrics["final_ankle_middle"], (255, 255, 0))
 
-    # mechanical axes on femur
-    draw_ln(metrics["femur_head"], metrics["femur_ax_middle"], (0, 255, 0))
+    # LDFA: femur mechanical axis via notch
     draw_ln(metrics["femur_head"], metrics["femur_notch"], (0, 255, 255))
 
-    # mechanical axes on tibia
-    draw_ln(metrics["final_ankle_middle"], metrics["tibia_ax_middle"], (0, 255, 0))
+    # MPTA: tibia mechanical axis via intercondylar
     draw_ln(metrics["final_ankle_middle"], metrics["tibia_intercondiler"], (0, 255, 255))
 
-    femur_text_x = (metrics["femur_ax_middle"][0] + metrics["femur_lateral"][0]) / 2.0
-    femur_text_y = metrics["femur_ax_middle"][1] - 15.0
-    
-    tibia_text_x = (metrics["tibia_ax_middle"][0] + metrics["tibia_medial"][0]) / 2.0
-    tibia_text_y = metrics["tibia_ax_middle"][1] + 25.0
+    femur_text_x = metrics["femur_notch"][0] + 8
+    femur_text_y = metrics["femur_notch"][1]
+    tibia_text_x = metrics["tibia_intercondiler"][0] + 8
+    tibia_text_y = metrics["tibia_intercondiler"][1]
 
-    put_text(f"{metrics['femur_mech_angle_ax_middle']:.2f}", (femur_text_x - 15, femur_text_y), (255, 255, 255))
-    put_text(f"{metrics['femur_mech_angle_notch']:.2f}", (femur_text_x - 15, femur_text_y - 15), (0, 255, 255))
-    put_text(f"{metrics['tibia_mech_angle_ax_middle']:.2f}", (tibia_text_x - 15, tibia_text_y), (255, 255, 255))
-    put_text(f"{metrics['tibia_mech_angle_inter']:.2f}", (tibia_text_x - 15, tibia_text_y+15), (0, 255, 255))
+    put_text(f"LDFA {metrics['femur_mech_angle_notch']:.2f}", (femur_text_x, femur_text_y), (0, 255, 255))
+    put_text(f"MPTA {metrics['tibia_mech_angle_inter']:.2f}", (tibia_text_x, tibia_text_y), (0, 255, 255))
     
 
     return vis_img
