@@ -12,7 +12,7 @@ class ImageViewer {
     this.vx        = 0;
     this.vy        = 0;
     this._rafId    = null;
-    this.MIN_SCALE = 0.5;
+    this.MIN_SCALE = 0.1;
     this.MAX_SCALE = 20;
     this.toolbar   = null;
     this.zoomBadge = null;
@@ -35,11 +35,12 @@ class ImageViewer {
     const ch = this.container.clientHeight || 800;
     const iw = this.img.naturalWidth;
     const ih = this.img.naturalHeight;
-    const scaleX = cw / iw;
-    const scaleY = ch / ih;
-    this.scale   = Math.min(scaleX, scaleY);
-    this.tx      = (cw - iw * this.scale) / 2;
-    this.ty      = (ch - ih * this.scale) / 2;
+    const scaleX   = cw / iw;
+    const scaleY   = ch / ih;
+    this.MIN_SCALE = Math.min(scaleX, scaleY); // can't zoom out past initial fit
+    this.scale     = this.MIN_SCALE;
+    this.tx        = (cw - iw * this.scale) / 2;
+    this.ty        = (ch - ih * this.scale) / 2;
     this._applyTransform();
     this._updateBadge();
   }
@@ -64,6 +65,7 @@ class ImageViewer {
       </button>
     `;
     this.toolbar.addEventListener('mousedown', e => e.stopPropagation());
+    this.toolbar.addEventListener('dblclick',  e => e.stopPropagation());
     this.toolbar.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
@@ -176,11 +178,22 @@ class ImageViewer {
     const ch = this.container.clientHeight;
     const iw = this.img.naturalWidth  * this.scale;
     const ih = this.img.naturalHeight * this.scale;
-    const m  = 80; // min px of image that must remain visible
-    this.tx = Math.min(this.tx, cw - m);
-    this.tx = Math.max(this.tx, m - iw);
-    this.ty = Math.min(this.ty, ch - m);
-    this.ty = Math.max(this.ty, m - ih);
+
+    // Each axis: if image fits inside container, center it; otherwise clamp so
+    // image edges never move past container edges (no empty space, no sliding off).
+    if (iw <= cw) {
+      this.tx = (cw - iw) / 2;
+    } else {
+      this.tx = Math.min(this.tx, 0);
+      this.tx = Math.max(this.tx, cw - iw);
+    }
+
+    if (ih <= ch) {
+      this.ty = (ch - ih) / 2;
+    } else {
+      this.ty = Math.min(this.ty, 0);
+      this.ty = Math.max(this.ty, ch - ih);
+    }
   }
 
   _startMomentum() {

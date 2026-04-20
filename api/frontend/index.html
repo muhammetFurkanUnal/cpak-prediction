@@ -74,38 +74,28 @@
     </div><!-- /top-grid -->
 
 
-    <!-- RESULTS SECTION: shown after inference. Two columns — metrics (left) + image (right) -->
+    <!-- RESULTS SECTION: shown after inference. Viewer fills viewport, metrics float as overlay panel. -->
     <div id="results-section" style="display:none;">
       <div id="results-grid" class="results-grid">
 
-        <!-- LEFT: mechanical angle metric cards -->
-        <div class="metrics-panel">
-          <div class="metrics-grid" id="metrics-grid">
-            <div class="metric-card femur-n">
-              <div class="metric-bone">Femur</div>
-              <div class="metric-method">LDFA</div>
-              <div class="metric-value" id="m-femur-n">—<span class="metric-unit">°</span></div>
-            </div>
-            <div class="metric-card tibia-in">
-              <div class="metric-bone">Tibia</div>
-              <div class="metric-method">MPTA</div>
-              <div class="metric-value" id="m-tibia-in">—<span class="metric-unit">°</span></div>
-            </div>
-          </div>
-        </div><!-- /metrics-panel -->
+        <!-- Floating action buttons (top-left overlay) -->
+        <div class="map-actions">
+          <button class="download-btn" id="dl-vis" style="display:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Download
+          </button>
+          <button class="panel-clear-btn" id="panel-clear-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Clear
+          </button>
+        </div>
 
-        <!-- RIGHT: annotated X-ray viewer with mechanical axes drawn on canvas -->
+        <!-- Full-screen annotated X-ray viewer -->
         <div class="result-img-card">
           <div class="result-img-header">
             <div class="result-img-title">
               <span>Mechanical Axes</span>
               <span class="result-badge badge-vis">visualize</span>
-            </div>
-            <div class="header-actions">
-              <button class="download-btn" id="dl-vis" style="display:none;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Download
-              </button>
             </div>
           </div>
           <!-- Interactive image container: zoom, pan, fullscreen -->

@@ -1,10 +1,12 @@
 const API = '';
 
 // ── State ──────────────────────────────────────────────────────────────────
-let selectedFile = null;
-let visBlob      = null;
+let selectedFile   = null;
+let visBlob        = null;
+let currentViewer  = null;
 
 // ── DOM ────────────────────────────────────────────────────────────────────
+const appEl          = document.querySelector('.app');
 const uploadZone     = document.getElementById('upload-zone');
 const fileInput      = document.getElementById('file-input');
 const previewImg     = document.getElementById('preview-img');
@@ -13,12 +15,12 @@ const uploadPh       = document.getElementById('upload-placeholder');
 const modelSelect    = document.getElementById('model-select');
 const runBtn         = document.getElementById('run-btn');
 const clearBtn       = document.getElementById('clear-btn');
+const panelClearBtn  = document.getElementById('panel-clear-btn');
 const btnSpinner     = document.getElementById('btn-spinner');
 const btnIcon        = document.getElementById('btn-icon');
 const btnLabel       = document.getElementById('btn-label');
 const topGrid        = document.getElementById('top-grid');
 const resultsSection = document.getElementById('results-section');
-const metricsGrid    = document.getElementById('metrics-grid');
 const resultsGrid    = document.getElementById('results-grid');
 const visWrap        = document.getElementById('vis-wrap');
 const dlVis          = document.getElementById('dl-vis');
@@ -76,18 +78,21 @@ uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag
 uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
 
 // ── Clear ──────────────────────────────────────────────────────────────────
-clearBtn.addEventListener('click', () => {
+function doClear() {
   selectedFile = null; fileInput.value = '';
   previewImg.src = ''; previewImg.classList.remove('visible');
   uploadPh.style.display = ''; previewName.textContent = '';
   topGrid.style.display = '';
   navLoadBtn.classList.remove('visible');
   resultsSection.style.display = 'none';
-  metricsGrid.classList.remove('visible');
   resultsGrid.classList.remove('visible');
+  appEl.classList.remove('map-view');
+  currentViewer = null;
   visBlob = null;
   updateRunBtn();
-});
+}
+clearBtn.addEventListener('click', doClear);
+panelClearBtn.addEventListener('click', doClear);
 
 // ── Run state ──────────────────────────────────────────────────────────────
 function updateRunBtn() { runBtn.disabled = !selectedFile || !modelSelect.value; }
@@ -113,14 +118,15 @@ async function runInference() {
     const data = await jsonResp.json();
     visBlob = await buildVisBlob(selectedFile, data.keypoints, data.metrics);
 
-    renderMetrics(data.metrics);
-    renderImage(visBlob, selectedFile.name);
-
+    appEl.classList.add('map-view');
     topGrid.style.display = 'none';
     navLoadBtn.classList.add('visible');
+
+    renderImage(visBlob, selectedFile.name);
+
     requestAnimationFrame(() => {
       resultsGrid.classList.add('visible');
-      metricsGrid.classList.add('visible');
+      if (currentViewer) currentViewer._fitToContainer();
     });
   } catch (err) {
     showToast('Inference failed: ' + err.message);
@@ -137,11 +143,6 @@ function postImage(url, file) {
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
-function renderMetrics(m) {
-  document.getElementById('m-femur-n').innerHTML  = m.femur_mech_angle_notch.toFixed(2) + '<span class="metric-unit">°</span>';
-  document.getElementById('m-tibia-in').innerHTML = m.tibia_mech_angle_inter.toFixed(2)  + '<span class="metric-unit">°</span>';
-}
-
 function renderImage(visB, filename) {
   const stem = filename.replace(/\.[^.]+$/, '');
   mountViewer(visWrap, URL.createObjectURL(visB));
@@ -156,8 +157,8 @@ function mountViewer(container, imgUrl) {
   img.className = 'viewer-img';
   img.src = imgUrl;
   container.appendChild(img);
-  const viewer = new ImageViewer(container);
-  viewer.mountImage(img);
+  currentViewer = new ImageViewer(container);
+  currentViewer.mountImage(img);
 }
 
 function showImgLoading(wrap) {

@@ -149,8 +149,12 @@ function drawAxesOnCanvas(img, axes, metrics, lw) {
   const ldfaHOff   = ((axes.femurLateral.x - femurMidX) / ldfaOutLen) * lw * 22;
   label(axes.femurLateral, `LDFA  ${metrics.femur_mech_angle_notch.toFixed(1)}°`, LDFA_C, ldfaHOff, -vOff);
 
-  // MPTA label: below the tibial plateau at intercondylar
-  label(axes.tibiaIntercondiler, `MPTA  ${metrics.tibia_mech_angle_inter.toFixed(1)}°`, MPTA_C, lw * 8, vOff);
+  // MPTA label: at medial tibial plateau endpoint, pushed outward from plateau midpoint and downward
+  const tibiaMidX  = (axes.tibiaLateral.x + axes.tibiaMedial.x) / 2;
+  const tibiaMidY  = (axes.tibiaLateral.y + axes.tibiaMedial.y) / 2;
+  const mptaOutLen = Math.hypot(axes.tibiaMedial.x - tibiaMidX, axes.tibiaMedial.y - tibiaMidY) || 1;
+  const mptaHOff   = ((axes.tibiaMedial.x - tibiaMidX) / mptaOutLen) * lw * 22;
+  label(axes.tibiaMedial, `MPTA  ${metrics.tibia_mech_angle_inter.toFixed(1)}°`, MPTA_C, mptaHOff, vOff);
 
   return canvas;
 }
