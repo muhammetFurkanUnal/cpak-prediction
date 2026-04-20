@@ -98,6 +98,57 @@
               <span class="result-badge badge-vis">visualize</span>
             </div>
           </div>
+          <!-- CPAK classification side panel -->
+          <div class="cpak-panel" id="cpak-panel">
+            <!-- Arrow tab — always visible on the right edge of the panel -->
+            <button class="cpak-tab" id="cpak-tab" title="Toggle CPAK panel">
+              <svg class="cpak-tab-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+
+            <!-- Scrollable content -->
+            <div class="cpak-content">
+              <div class="cpak-panel-header">
+                <span class="cpak-panel-title">CPAK Classification</span>
+              </div>
+
+              <div class="cpak-type-hero">
+                <div class="cpak-type-label">Type</div>
+                <div class="cpak-type-value" id="cpak-type-value">—</div>
+              </div>
+
+              <div class="cpak-angles">
+                <div class="cpak-angle-row">
+                  <span class="cpak-angle-key ldfa-color">LDFA</span>
+                  <span class="cpak-angle-val" id="cpak-ldfa">—</span>
+                </div>
+                <div class="cpak-angle-row">
+                  <span class="cpak-angle-key mpta-color">MPTA</span>
+                  <span class="cpak-angle-val" id="cpak-mpta">—</span>
+                </div>
+                <div class="cpak-divider"></div>
+                <div class="cpak-angle-row">
+                  <span class="cpak-angle-key">aHKA</span>
+                  <span class="cpak-angle-val" id="cpak-ahka">—</span>
+                  <span class="cpak-cat" id="cpak-ahka-cat"></span>
+                </div>
+                <div class="cpak-angle-row">
+                  <span class="cpak-angle-key">JLO</span>
+                  <span class="cpak-angle-val" id="cpak-jlo">—</span>
+                  <span class="cpak-cat" id="cpak-jlo-cat"></span>
+                </div>
+              </div>
+
+              <div class="cpak-matrix-label">Phenotype Matrix</div>
+              <div class="cpak-matrix" id="cpak-matrix"><!-- filled by JS --></div>
+              <div class="cpak-matrix-legend"><span>rows: aHKA (Varus / Neutral / Valgus)</span></div>
+              <div class="cpak-matrix-legend" style="padding-top:0"><span>cols: JLO (Proximal / Neutral / Distal)</span></div>
+
+              <div class="cpak-hint">Drag dots to recalculate</div>
+            </div>
+          </div>
+
           <!-- Interactive image container: zoom, pan, fullscreen -->
           <div class="viewer-container" id="vis-wrap">
             <div class="img-placeholder">
@@ -116,6 +167,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="/static/viewer.js"></script>
+<script src="/static/cpak.js"></script>
 <script src="/static/canvas.js"></script>
 <script src="/static/overlay.js"></script>
 <script src="/static/app.js"></script>

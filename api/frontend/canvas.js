@@ -132,12 +132,14 @@ function getDefaultLabelPositions(axes, metrics, lw, imgHeight) {
 
   return [
     {
+      key:   'ldfa',
       text:  `LDFA  ${metrics.femur_mech_angle_notch.toFixed(1)}°`,
       color: '#22d3ee',
       ix:    axes.femurLateral.x + ldfaHOff,
       iy:    axes.femurLateral.y - vOff,
     },
     {
+      key:   'mpta',
       text:  `MPTA  ${metrics.tibia_mech_angle_inter.toFixed(1)}°`,
       color: '#fb923c',
       ix:    axes.tibiaMedial.x + mptaHOff,

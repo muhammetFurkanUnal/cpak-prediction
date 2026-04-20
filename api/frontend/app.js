@@ -7,6 +7,7 @@ let visLw              = 1;
 let visImgHeight       = 0;
 let currentViewer      = null;
 let currentAxesOverlay = null;
+let cpakPanelOpen      = false;
 
 // ── DOM ────────────────────────────────────────────────────────────────────
 const appEl          = document.querySelector('.app');
@@ -32,6 +33,16 @@ const modelNameDisp  = document.getElementById('model-name-display');
 const toast          = document.getElementById('toast');
 const navLoadBtn     = document.getElementById('nav-load-btn');
 const fabInput       = document.getElementById('fab-input');
+const cpakPanel      = document.getElementById('cpak-panel');
+const cpakTab        = document.getElementById('cpak-tab');
+const cpakTypeValue  = document.getElementById('cpak-type-value');
+const cpakLdfa       = document.getElementById('cpak-ldfa');
+const cpakMpta       = document.getElementById('cpak-mpta');
+const cpakAhka       = document.getElementById('cpak-ahka');
+const cpakJlo        = document.getElementById('cpak-jlo');
+const cpakAhkaCat    = document.getElementById('cpak-ahka-cat');
+const cpakJloCat     = document.getElementById('cpak-jlo-cat');
+const cpakMatrix     = document.getElementById('cpak-matrix');
 
 // ── Health check ───────────────────────────────────────────────────────────
 async function checkHealth() {
@@ -87,6 +98,7 @@ function doClear() {
   uploadPh.style.display = ''; previewName.textContent = '';
   topGrid.style.display = '';
   navLoadBtn.classList.remove('visible');
+  closeCpakPanel();
   resultsSection.style.display = 'none';
   resultsGrid.classList.remove('visible');
   appEl.classList.remove('map-view');
@@ -143,6 +155,15 @@ async function runInference() {
         currentAxesOverlay = new AxesOverlay(visWrap, currentViewer, {
           dots: dotPositions, labels: labelPositions, lw, imgHeight,
         });
+
+        // Compute initial CPAK, populate panel and open it
+        const initAngles = computeAngles(currentAxesOverlay.dots);
+        if (initAngles) {
+          updateCpakPanel(classifyCPAK(initAngles.ldfa, initAngles.mpta));
+        }
+        openCpakPanel();
+
+        currentAxesOverlay.onAnglesChange = result => updateCpakPanel(result);
       }
     });
   } catch (err) {
@@ -219,6 +240,55 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
 }
+
+// ── CPAK Panel ─────────────────────────────────────────────────────────────
+function buildCpakMatrix(activeType) {
+  cpakMatrix.innerHTML = '';
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const type = CPAK_MATRIX[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'cpak-matrix-cell' + (type === activeType ? ' active' : '');
+      cell.innerHTML = `<span class="cell-type">${type}</span>`;
+      cpakMatrix.appendChild(cell);
+    }
+  }
+}
+
+function setCpakCatClass(el, cat) {
+  el.className = 'cpak-cat';
+  const c = cat.toLowerCase();
+  if      (c === 'varus')          el.classList.add('varus');
+  else if (c === 'valgus')         el.classList.add('valgus');
+  else if (c === 'neutral')        el.classList.add('neutral');
+  else if (c.includes('proximal')) el.classList.add('proximal');
+  else if (c.includes('distal'))   el.classList.add('distal');
+}
+
+function updateCpakPanel(result) {
+  cpakTypeValue.textContent = result.cpakType;
+  cpakLdfa.textContent      = result.ldfa.toFixed(1) + '°';
+  cpakMpta.textContent      = result.mpta.toFixed(1) + '°';
+  cpakAhka.textContent      = (result.ahka >= 0 ? '+' : '') + result.ahka.toFixed(1) + '°';
+  cpakJlo.textContent       = result.jlo.toFixed(1) + '°';
+  cpakAhkaCat.textContent   = result.ahkaCat;
+  cpakJloCat.textContent    = result.jloCat;
+  setCpakCatClass(cpakAhkaCat, result.ahkaCat);
+  setCpakCatClass(cpakJloCat,  result.jloCat);
+  buildCpakMatrix(result.cpakType);
+}
+
+function openCpakPanel() {
+  cpakPanelOpen = true;
+  cpakPanel.classList.add('open');
+}
+
+function closeCpakPanel() {
+  cpakPanelOpen = false;
+  cpakPanel.classList.remove('open');
+}
+
+cpakTab.addEventListener('click', () => cpakPanelOpen ? closeCpakPanel() : openCpakPanel());
 
 // ── Init ───────────────────────────────────────────────────────────────────
 checkHealth();

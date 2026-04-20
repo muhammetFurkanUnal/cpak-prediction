@@ -103,13 +103,15 @@ class AxesOverlay {
     this._origDots   = JSON.parse(JSON.stringify(config.dots));
     this._origLabels = JSON.parse(JSON.stringify(config.labels));
 
-    this.dots      = {};
-    this.labels    = [];
-    this._svgLines = {};
-    this._lineDefs = null;
-    this.svg       = null;
-    this.resetBtn  = null;
-    this._modified = false;
+    this.dots            = {};
+    this.labels          = [];
+    this.labelMap        = {};   // key → AngleLabel, populated in _buildLabels
+    this._svgLines       = {};
+    this._lineDefs       = null;
+    this.svg             = null;
+    this.resetBtn        = null;
+    this._modified       = false;
+    this.onAnglesChange  = null; // callback(cpakResult)
 
     this._buildSvg();
     this._buildDots(config.dots);
@@ -164,7 +166,7 @@ class AxesOverlay {
     for (const [key, color] of Object.entries(colors)) {
       if (!dots[key]) continue;
       const dot = new DotHandle(this.container, this.viewer, key, dots[key].ix, dots[key].iy, color);
-      dot.onMove = () => { this._updateLines(); this._markModified(); };
+      dot.onMove = () => { this._updateLines(); this._markModified(); this._updateAngles(); };
       this.dots[key] = dot;
     }
   }
@@ -173,6 +175,7 @@ class AxesOverlay {
     this.labels = labels.map(pos => {
       const lbl = new AngleLabel(this.container, this.viewer, pos);
       lbl.onMove = () => this._markModified();
+      if (pos.key) this.labelMap[pos.key] = lbl;
       return lbl;
     });
   }
@@ -227,6 +230,17 @@ class AxesOverlay {
       el.setAttribute('x2', pb.x);  el.setAttribute('y2', pb.y);
       el.setAttribute('stroke-width', sw);
     }
+  }
+
+  _updateAngles() {
+    const angles = computeAngles(this.dots);
+    if (!angles) return;
+    const result = classifyCPAK(angles.ldfa, angles.mpta);
+
+    if (this.labelMap['ldfa']) this.labelMap['ldfa'].updateText(`LDFA  ${result.ldfa.toFixed(1)}°`);
+    if (this.labelMap['mpta']) this.labelMap['mpta'].updateText(`MPTA  ${result.mpta.toFixed(1)}°`);
+
+    if (this.onAnglesChange) this.onAnglesChange(result);
   }
 
   reset() {
@@ -330,6 +344,11 @@ class AngleLabel {
     });
 
     el.addEventListener('dblclick', e => e.stopPropagation());
+  }
+
+  updateText(text) {
+    this.text = text;
+    if (this._el) this._el.querySelector('span').textContent = text;
   }
 
   remove() { this._el?.remove(); this._el = null; }
