@@ -12,8 +12,9 @@ class ImageViewer {
     this.vx        = 0;
     this.vy        = 0;
     this._rafId    = null;
-    this.MIN_SCALE = 0.1;
-    this.MAX_SCALE = 20;
+    this.MIN_SCALE        = 0.1;
+    this.MAX_SCALE        = 20;
+    this.onTransformChange = null;
     this.toolbar   = null;
     this.zoomBadge = null;
   }
@@ -227,6 +228,7 @@ class ImageViewer {
     this.container.style.setProperty('--grid-size', `${gs}px`);
     this.container.style.setProperty('--grid-ox',   `${ox}px`);
     this.container.style.setProperty('--grid-oy',   `${oy}px`);
+    if (this.onTransformChange) this.onTransformChange();
   }
 
   _updateBadge() {

@@ -69,14 +69,9 @@ function computeAxes(kps) {
   };
 }
 
-// Draw mechanical axes on a new canvas at full image resolution, returns canvas
-function drawAxesOnCanvas(img, axes, metrics, lw) {
-  const canvas = document.createElement('canvas');
-  canvas.width  = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-
+// Draw axes lines + dots onto an existing 2D context (used for download baking).
+// axes: { femurHead:{x,y}, femurLateral:{x,y}, ... } — all in image natural-pixel space.
+function drawAxesOnContext(ctx, axes, lw, imgHeight) {
   const dot = (pt, color, r = lw * 1.4) => {
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
@@ -88,49 +83,29 @@ function drawAxesOnCanvas(img, axes, metrics, lw) {
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.strokeStyle = color;
-    ctx.lineWidth = lw;
+    ctx.lineWidth   = lw;
     ctx.stroke();
-  };
-  const label = (pt, text, color, offsetX = 6, offsetY = 0) => {
-    const fs  = Math.max(11, lw * 9);
-    ctx.font  = `bold ${fs}px sans-serif`;
-    const pad = fs * 0.35;
-    const w   = ctx.measureText(text).width + pad * 2;
-    const h   = fs + pad * 2;
-    const x   = pt.x + offsetX;
-    const y   = pt.y + offsetY - fs * 0.35;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.beginPath();
-    ctx.roundRect(x - pad, y - fs, w, h, fs * 0.3);
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, y);
   };
 
   const GREEN  = '#00e676';
   const BLUE   = '#4488ff';
   const YELLOW = '#ffdd00';
-  const LDFA_C = '#22d3ee';  // cyan   — femur / LDFA
-  const MPTA_C = '#fb923c';  // orange — tibia / MPTA
+  const LDFA_C = '#22d3ee';
+  const MPTA_C = '#fb923c';
 
-  // Joint connection lines (green)
   line(axes.femurLateral,  axes.femurMedial,  GREEN);
   line(axes.tibiaLateral,  axes.tibiaMedial,  GREEN);
   line(axes.ankleLateral,  axes.ankleMedial,  GREEN);
 
-  // Extend axis lines so they cross the joint connection lines
-  const ext    = img.naturalHeight * 0.03;
+  const ext    = imgHeight * 0.03;
   const extend = (a, b) => {
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     return { x: b.x + (b.x - a.x) / len * ext, y: b.y + (b.y - a.y) / len * ext };
   };
 
-  // LDFA: femur head → past notch, crossing the femoral condyle line
-  line(axes.femurHead, extend(axes.femurHead, axes.femurNotch), LDFA_C);
-  // MPTA: ankle middle → past intercondylar, crossing the tibial plateau line
+  line(axes.femurHead,        extend(axes.femurHead,        axes.femurNotch),         LDFA_C);
   line(axes.finalAnkleMiddle, extend(axes.finalAnkleMiddle, axes.tibiaIntercondiler), MPTA_C);
 
-  // Landmark dots (no dot on notch or intercondylar)
   dot(axes.femurHead,        GREEN);
   dot(axes.femurLateral,     BLUE);
   dot(axes.femurMedial,      BLUE);
@@ -139,37 +114,81 @@ function drawAxesOnCanvas(img, axes, metrics, lw) {
   dot(axes.ankleLateral,     BLUE);
   dot(axes.ankleMedial,      BLUE);
   dot(axes.finalAnkleMiddle, YELLOW);
+}
 
-  const vOff = img.naturalHeight * 0.04;
+// Compute initial label positions in image-pixel space (mirrors former canvas label placement)
+function getDefaultLabelPositions(axes, metrics, lw, imgHeight) {
+  const vOff = imgHeight * 0.04;
 
-  // LDFA label: at lateral condyle, pushed outward from condyle midpoint and upward
   const femurMidX  = (axes.femurLateral.x + axes.femurMedial.x) / 2;
   const femurMidY  = (axes.femurLateral.y + axes.femurMedial.y) / 2;
   const ldfaOutLen = Math.hypot(axes.femurLateral.x - femurMidX, axes.femurLateral.y - femurMidY) || 1;
   const ldfaHOff   = ((axes.femurLateral.x - femurMidX) / ldfaOutLen) * lw * 22;
-  label(axes.femurLateral, `LDFA  ${metrics.femur_mech_angle_notch.toFixed(1)}°`, LDFA_C, ldfaHOff, -vOff);
 
-  // MPTA label: at medial tibial plateau endpoint, pushed outward from plateau midpoint and downward
   const tibiaMidX  = (axes.tibiaLateral.x + axes.tibiaMedial.x) / 2;
   const tibiaMidY  = (axes.tibiaLateral.y + axes.tibiaMedial.y) / 2;
   const mptaOutLen = Math.hypot(axes.tibiaMedial.x - tibiaMidX, axes.tibiaMedial.y - tibiaMidY) || 1;
   const mptaHOff   = ((axes.tibiaMedial.x - tibiaMidX) / mptaOutLen) * lw * 22;
-  label(axes.tibiaMedial, `MPTA  ${metrics.tibia_mech_angle_inter.toFixed(1)}°`, MPTA_C, mptaHOff, vOff);
 
-  return canvas;
+  return [
+    {
+      text:  `LDFA  ${metrics.femur_mech_angle_notch.toFixed(1)}°`,
+      color: '#22d3ee',
+      ix:    axes.femurLateral.x + ldfaHOff,
+      iy:    axes.femurLateral.y - vOff,
+    },
+    {
+      text:  `MPTA  ${metrics.tibia_mech_angle_inter.toFixed(1)}°`,
+      color: '#fb923c',
+      ix:    axes.tibiaMedial.x + mptaHOff,
+      iy:    axes.tibiaMedial.y + vOff,
+    },
+  ];
 }
 
-// Build an annotated PNG Blob from the original file + inference results
-async function buildVisBlob(file, keypoints, metrics) {
+// Draw labels onto an existing canvas context (used when baking labels into download)
+function drawLabelsOnCanvas(ctx, labelData, lw) {
+  const fs = Math.max(11, lw * 9);
+  ctx.font = `bold ${fs}px sans-serif`;
+  for (const { ix, iy, text, color } of labelData) {
+    const pad = fs * 0.35;
+    const w   = ctx.measureText(text).width + pad * 2;
+    const h   = fs + pad * 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(ix - pad, iy - fs, w, h, fs * 0.3);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.fillText(text, ix, iy);
+  }
+}
+
+// Build image-only canvas + all initial overlay positions.
+// Returns { canvas (raw image, no axes drawn), dotPositions, labelPositions, lw, imgHeight }
+async function buildVisCanvas(file, keypoints, metrics) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const axes   = computeAxes(keypoints);
-      const lw     = Math.max(1, Math.round(img.naturalWidth / 400));
-      const canvas = drawAxesOnCanvas(img, axes, metrics, lw);
+      // Canvas contains only the raw image — axes/dots drawn as HTML/SVG overlays
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+
+      const axes = computeAxes(keypoints);
+      const lw   = Math.max(1, Math.round(img.naturalWidth / 400));
+
+      // Convert axes {x,y} → dotPositions {key: {ix,iy}} (same coordinate space)
+      const dotPositions = {};
+      for (const [key, val] of Object.entries(axes)) {
+        dotPositions[key] = { ix: val.x, iy: val.y };
+      }
+
+      const labelPositions = getDefaultLabelPositions(axes, metrics, lw, img.naturalHeight);
+
       URL.revokeObjectURL(url);
-      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')), 'image/png');
+      resolve({ canvas, dotPositions, labelPositions, lw, imgHeight: img.naturalHeight });
     };
     img.onerror = () => reject(new Error('Failed to load image for canvas drawing'));
     img.src = url;

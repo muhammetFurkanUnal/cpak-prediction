@@ -215,6 +215,115 @@ select:focus { outline: none; border-color: var(--accent); }
 .viewer-container:hover .viewer-toolbar,
 .viewer-container:fullscreen .viewer-toolbar { opacity: 1; }
 
+/* ── Draggable dot handles ───────────────────────────────── */
+.dot-handle {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--dc, #fff);
+  border: 2px solid rgba(0,0,0,0.45);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  z-index: 16;
+  pointer-events: auto;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.dot-handle:hover {
+  transform: translate(-50%, -50%) scale(1.45);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dc, #fff) 35%, transparent);
+}
+.dot-handle.dragging {
+  cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.6);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dc, #fff) 45%, transparent);
+  z-index: 17;
+}
+
+/* Coordinate tooltip (body-level, no overflow clipping) */
+.dot-tooltip {
+  position: fixed;
+  background: rgba(0,0,0,0.82);
+  color: #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.dot-tooltip.visible { opacity: 1; }
+
+/* Reset positions button */
+.axes-reset-btn {
+  position: absolute;
+  bottom: 56px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: rgba(7, 13, 26, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.axes-reset-btn:hover {
+  background: color-mix(in srgb, var(--warn) 12%, rgba(7,13,26,0.88));
+  box-shadow: 0 0 0 1px var(--warn);
+}
+
+/* ── Draggable angle labels ───────────────────────────────── */
+.angle-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px 6px 8px;
+  background: rgba(7, 13, 26, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--lc, #fff);
+  border-radius: 8px;
+  color: var(--lc, #fff);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+  z-index: 15;
+  pointer-events: auto;
+  transition: box-shadow 0.15s, opacity 0.15s;
+  transform: translate(0, -50%); /* vertically center on anchor point */
+}
+.angle-label:hover {
+  box-shadow: 0 0 0 1px var(--lc, #fff), 0 4px 16px rgba(0,0,0,0.4);
+}
+.angle-label.dragging {
+  cursor: grabbing;
+  opacity: 0.9;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+}
+.angle-label-grip {
+  flex-shrink: 0;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+.angle-label:hover .angle-label-grip { opacity: 0.7; }
+
 .viewer-toolbar .icon-btn { width: 26px; height: 26px; border-radius: 5px; }
 
 /* Zoom level badge */

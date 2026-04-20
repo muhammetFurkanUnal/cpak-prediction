@@ -1,9 +1,12 @@
 const API = '';
 
 // ── State ──────────────────────────────────────────────────────────────────
-let selectedFile   = null;
-let visBlob        = null;
-let currentViewer  = null;
+let selectedFile       = null;
+let visCanvas          = null;   // raw image canvas (no axes drawn — used as download base)
+let visLw              = 1;
+let visImgHeight       = 0;
+let currentViewer      = null;
+let currentAxesOverlay = null;
 
 // ── DOM ────────────────────────────────────────────────────────────────────
 const appEl          = document.querySelector('.app');
@@ -87,8 +90,10 @@ function doClear() {
   resultsSection.style.display = 'none';
   resultsGrid.classList.remove('visible');
   appEl.classList.remove('map-view');
-  currentViewer = null;
-  visBlob = null;
+  currentAxesOverlay?.remove();
+  currentAxesOverlay = null;
+  currentViewer      = null;
+  visCanvas          = null;
   updateRunBtn();
 }
 clearBtn.addEventListener('click', doClear);
@@ -116,17 +121,29 @@ async function runInference() {
     if (!jsonResp.ok) throw new Error(await jsonResp.text());
 
     const data = await jsonResp.json();
-    visBlob = await buildVisBlob(selectedFile, data.keypoints, data.metrics);
+    const { canvas, dotPositions, labelPositions, lw, imgHeight } =
+      await buildVisCanvas(selectedFile, data.keypoints, data.metrics);
+    visCanvas    = canvas;
+    visLw        = lw;
+    visImgHeight = imgHeight;
 
     appEl.classList.add('map-view');
     topGrid.style.display = 'none';
     navLoadBtn.classList.add('visible');
 
-    renderImage(visBlob, selectedFile.name);
+    const blob = await new Promise((res, rej) =>
+      canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+    renderImage(blob, selectedFile.name);
 
     requestAnimationFrame(() => {
       resultsGrid.classList.add('visible');
-      if (currentViewer) currentViewer._fitToContainer();
+      if (currentViewer) {
+        currentViewer._fitToContainer();
+        currentAxesOverlay?.remove();
+        currentAxesOverlay = new AxesOverlay(visWrap, currentViewer, {
+          dots: dotPositions, labels: labelPositions, lw, imgHeight,
+        });
+      }
     });
   } catch (err) {
     showToast('Inference failed: ' + err.message);
@@ -143,11 +160,24 @@ function postImage(url, file) {
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
-function renderImage(visB, filename) {
+function renderImage(blob, filename) {
   const stem = filename.replace(/\.[^.]+$/, '');
-  mountViewer(visWrap, URL.createObjectURL(visB));
+  mountViewer(visWrap, URL.createObjectURL(blob));
   dlVis.style.display = '';
-  dlVis.onclick = () => downloadBlob(visB, `${stem}_axes.png`);
+  dlVis.onclick = () => downloadWithLabels(stem);
+}
+
+function downloadWithLabels(stem) {
+  const dc  = document.createElement('canvas');
+  dc.width  = visCanvas.width;
+  dc.height = visCanvas.height;
+  const ctx = dc.getContext('2d');
+  ctx.drawImage(visCanvas, 0, 0);
+  if (currentAxesOverlay) {
+    drawAxesOnContext(ctx, currentAxesOverlay.getDotPositions(), visLw, visImgHeight);
+    drawLabelsOnCanvas(ctx, currentAxesOverlay.getLabelPositions(), visLw);
+  }
+  dc.toBlob(blob => downloadBlob(blob, `${stem}_axes.png`), 'image/png');
 }
 
 function mountViewer(container, imgUrl) {
