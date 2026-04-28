@@ -1,7 +1,80 @@
 import cv2
 import numpy as np
 import os
+from pathlib import Path
+from collections import Counter
 import matplotlib.pyplot as plt
+from PIL import Image
+
+_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
+
+
+def analyze_dimensions(folder) -> dict:
+    """
+    Scan all images under `folder` recursively and return dimension statistics.
+
+    Returns
+    -------
+    {
+      "count":        int,
+      "skipped":      int,
+      "width":        {min, max, mean, std, median, p5, p25, p75, p95},
+      "height":       {min, max, mean, std, median, p5, p25, p75, p95},
+      "aspect_ratio": {min, max, mean, std, median},
+      "unique_sizes": int,
+      "most_common_sizes": [{"size": (w, h), "count": n}, ...],  # top-5
+    }
+    """
+    files = [
+        p for p in Path(folder).expanduser().resolve().rglob("*")
+        if p.suffix.lower() in _IMAGE_EXTENSIONS
+    ]
+
+    widths, heights, skipped = [], [], 0
+    for p in files:
+        try:
+            with Image.open(p) as img:
+                w, h = img.size
+                widths.append(w)
+                heights.append(h)
+        except Exception:
+            skipped += 1
+
+    if not widths:
+        return {"count": 0, "skipped": skipped}
+
+    w = np.array(widths, dtype=float)
+    h = np.array(heights, dtype=float)
+    ar = w / h
+
+    def _stats(arr):
+        p5, p25, p75, p95 = np.percentile(arr, [5, 25, 75, 95])
+        return {
+            "min":    float(arr.min()),
+            "max":    float(arr.max()),
+            "mean":   float(arr.mean()),
+            "std":    float(arr.std()),
+            "median": float(np.median(arr)),
+            "p5":     float(p5),
+            "p25":    float(p25),
+            "p75":    float(p75),
+            "p95":    float(p95),
+        }
+
+    res_counter = Counter(zip(widths, heights))
+    return {
+        "count":             len(widths),
+        "skipped":           skipped,
+        "width":             _stats(w),
+        "height":            _stats(h),
+        "aspect_ratio":      _stats(ar),
+        "unique_sizes":      len(res_counter),
+        "most_common_sizes": [
+            {"size": size, "count": cnt}
+            for size, cnt in res_counter.most_common(5)
+        ],
+    }
+
 
 def show_image(image, figsize=(5,5)):
     plt.figure(figsize=figsize)
@@ -120,9 +193,12 @@ def apply_black_letterbox(image, target_size=(640, 640)):
     resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_AREA)
     
     # Using black (0) for padding is standard for deep learning
-    canvas = np.zeros((th, tw), dtype=np.uint8)
+    channels = image.shape[2] if image.ndim == 3 else None
+    canvas = np.zeros((th, tw, channels), dtype=np.uint8) if channels else np.zeros((th, tw), dtype=np.uint8)
     dx = (tw - nw) // 2
     dy = (th - nh) // 2
     canvas[dy:dy+nh, dx:dx+nw] = resized
-    
+
     return canvas
+
+
