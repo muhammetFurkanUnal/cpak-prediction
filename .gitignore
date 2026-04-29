@@ -3,7 +3,7 @@ __pycache__
 .claude
 
 
-cpak-furkan-2026-04-13
+cpak-furkan-2026-04-29
 
 notebooks/out/inference/*
 !notebooks/out/inference/.gitkeep

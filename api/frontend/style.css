@@ -15,7 +15,16 @@
   --radius:  12px;
 }
 
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+:root[data-theme="light"] {
+  --bg:      #f1f5f9;
+  --surface: #ffffff;
+  --card:    #ffffff;
+  --border:  #dde3ed;
+  --text:    #0f172a;
+  --muted:   #64748b;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; transition: background .25s, color .25s; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
@@ -406,6 +415,17 @@ tbody td { padding: 8px 14px; font-family: 'JetBrains Mono', monospace; }
 .download-btn:hover { color: var(--text); background: var(--border); }
 
 /* Nav load button — shown in header after first inference */
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+.theme-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  cursor: pointer; transition: color .2s, background .2s, border-color .2s;
+}
+.theme-btn:hover { color: var(--text); background: var(--border); }
+
 .nav-load-btn {
   display: none; align-items: center; gap: 7px;
   padding: 7px 14px; border-radius: 8px; cursor: pointer;
@@ -416,6 +436,30 @@ tbody td { padding: 8px 14px; font-family: 'JetBrains Mono', monospace; }
 }
 .nav-load-btn.visible { display: flex; }
 .nav-load-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
+
+/* ── Light-mode specific overrides ──────────────────────────────── */
+[data-theme="light"] .viewer-container {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+}
+[data-theme="light"] .viewer-toolbar {
+  background: rgba(15, 23, 42, 0.88);
+}
+[data-theme="light"] .zoom-badge {
+  background: rgba(15, 23, 42, 0.75); color: rgba(255,255,255,.6);
+}
+[data-theme="light"] .app.map-view .map-actions .download-btn,
+[data-theme="light"] .app.map-view .panel-clear-btn {
+  background: rgba(15, 23, 42, 0.88); color: rgba(255,255,255,.7);
+  border-color: rgba(255,255,255,.15);
+}
+[data-theme="light"] .app.map-view .map-actions .download-btn:hover {
+  color: var(--accent);
+}
+[data-theme="light"] .app.map-view .panel-clear-btn:hover {
+  color: var(--danger); border-color: var(--danger);
+}
 
 
 /* ── CPAK Side Panel ──────────────────────────────────────────── */
