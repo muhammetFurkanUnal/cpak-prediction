@@ -73,10 +73,17 @@ function handleFile(file) {
   previewImg.classList.add('visible');
   uploadPh.style.display = 'none';
   previewName.textContent = file.name;
+  uploadZone.classList.add('has-image');
   updateRunBtn();
 }
 
-fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+fileInput.addEventListener('change', e => { handleFile(e.target.files[0]); fileInput.value = ''; });
+
+uploadZone.addEventListener('click', (e) => {
+  if (e.target === fileInput) return;
+  fileInput.value = '';
+  fileInput.click();
+});
 
 // Nav "Load Image" button — picks file and immediately re-runs inference
 fabInput.addEventListener('change', e => {
@@ -95,6 +102,7 @@ uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classL
 function doClear() {
   selectedFile = null; fileInput.value = '';
   previewImg.src = ''; previewImg.classList.remove('visible');
+  uploadZone.classList.remove('has-image');
   uploadPh.style.display = ''; previewName.textContent = '';
   topGrid.style.display = '';
   navLoadBtn.classList.remove('visible');
