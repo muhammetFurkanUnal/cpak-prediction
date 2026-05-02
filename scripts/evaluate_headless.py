@@ -16,19 +16,30 @@ CONFIG_PATH = REPO_ROOT / "kneeap-furkan-2026-04-29" / "config.yaml"
 
 
 def find_snapshots(shuffle: int) -> list[pathlib.Path]:
-    pattern = f"*trainset*shuffle{shuffle}/train"
-    candidates = list((REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models").glob(f"**/{pattern}"))
-    if not candidates:
+    dlc_models = REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models"
+    if not dlc_models.exists():
         return []
-    train_dir = candidates[0]
-    snapshots = sorted(train_dir.glob("snapshot-*.pt"), key=lambda p: int(re.search(r"(\d+)", p.stem).group()))
-    return snapshots
+    # tüm .pt dosyalarını bul
+    all_pts = sorted(dlc_models.rglob("*.pt"),
+                     key=lambda p: int(m.group()) if (m := re.search(r"(\d+)", p.stem)) else 0)
+    if shuffle is not None:
+        all_pts = [p for p in all_pts if f"shuffle{shuffle}" in str(p)]
+    return all_pts
 
 
 def list_snapshots(shuffle: int):
+    dlc_models = REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models"
+    print(f"Aranan dizin: {dlc_models}")
+    if not dlc_models.exists():
+        print("dlc-models dizini yok — eğitim tamamlandı mı?")
+        return
     snapshots = find_snapshots(shuffle)
     if not snapshots:
-        print("Snapshot bulunamadı.")
+        # dizin var ama .pt yok — ne var göster
+        all_files = list(dlc_models.rglob("*"))
+        print(f"dlc-models altında {len(all_files)} dosya var, .pt yok.")
+        for f in all_files[:20]:
+            print(f"  {f.relative_to(dlc_models)}")
         return
     print(f"{'Index':<6} {'İterasyon':<12} {'Dosya'}")
     print("-" * 50)
