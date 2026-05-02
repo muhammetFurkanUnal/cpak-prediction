@@ -15,38 +15,36 @@ REPO_ROOT   = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_PATH = REPO_ROOT / "kneeap-furkan-2026-04-29" / "config.yaml"
 
 
-def find_snapshots(shuffle: int) -> list[pathlib.Path]:
-    dlc_models = REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models"
-    if not dlc_models.exists():
+TRAIN_DIR = (REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models-pytorch"
+             / "iteration-0" / "kneeapApr29-trainset95shuffle1" / "train")
+
+
+def find_snapshots() -> list[pathlib.Path]:
+    if not TRAIN_DIR.exists():
         return []
-    # tüm .pt dosyalarını bul
-    all_pts = sorted(dlc_models.rglob("*.pt"),
-                     key=lambda p: int(m.group()) if (m := re.search(r"(\d+)", p.stem)) else 0)
-    if shuffle is not None:
-        all_pts = [p for p in all_pts if f"shuffle{shuffle}" in str(p)]
-    return all_pts
+    all_pts = [p for p in TRAIN_DIR.glob("*.pt") if re.search(r"\d+", p.stem)]
+    return sorted(all_pts, key=lambda p: int(re.search(r"(\d+)", p.stem).group()))
 
 
-def list_snapshots(shuffle: int):
-    dlc_models = REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models"
+def list_snapshots():
+    dlc_models = REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models-pytorch"
     print(f"Aranan dizin: {dlc_models}")
     if not dlc_models.exists():
-        print("dlc-models dizini yok — eğitim tamamlandı mı?")
+        print("dlc-models-pytorch dizini yok — eğitim tamamlandı mı?")
         return
-    snapshots = find_snapshots(shuffle)
+    snapshots = find_snapshots()
     if not snapshots:
         # dizin var ama .pt yok — ne var göster
         all_files = list(dlc_models.rglob("*"))
-        print(f"dlc-models altında {len(all_files)} dosya var, .pt yok.")
+        print(f"dlc-models-pytorch altında {len(all_files)} dosya var, .pt yok.")
         for f in all_files[:20]:
             print(f"  {f.relative_to(dlc_models)}")
         return
-    print(f"{'Index':<6} {'İterasyon':<12} {'Dosya'}")
-    print("-" * 50)
+    print(f"{'Index':<6} {'Dosya'}")
+    print("-" * 40)
     for i, s in enumerate(snapshots):
-        iters = re.search(r"(\d+)", s.stem).group()
         marker = " ← last" if i == len(snapshots) - 1 else ""
-        print(f"{i:<6} {iters:<12} {s.name}{marker}")
+        print(f"{i:<6} {s.name}{marker}")
 
 
 def set_snapshot_index(index: int):
@@ -64,7 +62,7 @@ def main():
     args = parser.parse_args()
 
     if args.list:
-        list_snapshots(args.shuffle)
+        list_snapshots()
         return
 
     if args.snapshot_index is not None:
