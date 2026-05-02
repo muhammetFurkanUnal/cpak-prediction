@@ -1,10 +1,10 @@
 """
 Headless DLC evaluate script
 ==============================
-Kullanım:
+Usage:
   python scripts/evaluate_headless.py --list
   python scripts/evaluate_headless.py                        # best snapshot
-  python scripts/evaluate_headless.py --snapshot-index 4    # 5. snapshot (0'dan başlar)
+  python scripts/evaluate_headless.py --snapshot-index 4    # 5th snapshot (0-based)
 """
 
 import argparse
@@ -22,15 +22,15 @@ def find_snapshots() -> list[pathlib.Path]:
     if not TRAIN_DIR.exists():
         return []
     pts = [p for p in TRAIN_DIR.glob("*.pt") if re.search(r"\d+", p.stem)]
-    return sorted(pts, key=lambda p: p.stem)  # DLC ile aynı: alfabetik
+    return sorted(pts, key=lambda p: p.stem)  # alphabetical, same as DLC
 
 
 def list_snapshots():
     snapshots = find_snapshots()
     if not snapshots:
-        print("Snapshot bulunamadı.")
+        print("No snapshots found.")
         return
-    print(f"{'Index':<6} {'Dosya'}")
+    print(f"{'Index':<6} {'File'}")
     print("-" * 40)
     for i, s in enumerate(snapshots):
         best = " ★ best (DLC default)" if "best" in s.stem else ""
@@ -39,20 +39,20 @@ def list_snapshots():
 
 @contextlib.contextmanager
 def hide_best_snapshot():
-    """DLC'nin snapshot-best-* dosyasını otomatik seçmesini geçici olarak engeller."""
+    """Temporarily hides snapshot-best-* so DLC is forced to use a numbered snapshot."""
     best_files = list(TRAIN_DIR.glob("snapshot-best-*.pt"))
     hidden = []
     for f in best_files:
         tmp = f.with_suffix(".pt.hidden")
         f.rename(tmp)
         hidden.append((tmp, f))
-        print(f"  [geçici gizlendi] {f.name}")
+        print(f"  [temporarily hidden] {f.name}")
     try:
         yield
     finally:
         for tmp, original in hidden:
             tmp.rename(original)
-            print(f"  [geri yüklendi] {original.name}")
+            print(f"  [restored] {original.name}")
 
 
 def set_snapshot_index(index: int):
@@ -66,7 +66,7 @@ def main():
     parser.add_argument("--shuffle", type=int, default=1)
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--snapshot-index", type=int, default=None,
-                        help="0=ilk, -1=son, 4=5. snapshot (best hariç, alfabetik sıra)")
+                        help="0=first, -1=last, 4=5th snapshot (excludes best, alphabetical order)")
     args = parser.parse_args()
 
     if args.list:
@@ -85,16 +85,15 @@ def main():
         try:
             chosen = non_best[args.snapshot_index]
         except IndexError:
-            print(f"Geçersiz index. 0–{len(non_best)-1} arasında bir değer gir.")
+            print(f"Invalid index. Use a value between 0 and {len(non_best)-1}.")
             return
-        print(f"Seçilen snapshot: {chosen.name}")
-        # DLC'nin alfabetik listesinde bu snapshot'ın index'ini bul
+        print(f"Selected snapshot: {chosen.name}")
         dlc_index = snapshots.index(chosen)
         set_snapshot_index(dlc_index)
         with hide_best_snapshot():
             deeplabcut.evaluate_network(config_path, Shuffles=[args.shuffle], plotting=True)
     else:
-        # varsayılan: DLC kendi seçsin (snapshot-best-*)
+        # default: let DLC pick (snapshot-best-*)
         set_snapshot_index(-1)
         deeplabcut.evaluate_network(config_path, Shuffles=[args.shuffle], plotting=True)
 

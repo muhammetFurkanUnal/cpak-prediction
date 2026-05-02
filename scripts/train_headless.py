@@ -1,15 +1,15 @@
 """
 Headless DLC setup + training script
 =====================================
-SSH ortamında, sıfırdan proje klasörünü oluşturur ve eğitimi başlatır.
+Builds the project folder from scratch and starts training. Intended for SSH/headless use.
 
-Ön koşullar:
+Prerequisites:
   - pip install deeplabcut[pytorch] pandas tables
-  - Resimler preprocessing/knee-preop-prepped/ altında olmalı
+  - Images must be in preprocessing/knee-preop-prepped/
 
-Kullanım:
-  python scripts/train_headless.py            # setup + eğitim
-  python scripts/train_headless.py --setup-only  # sadece klasör kur
+Usage:
+  python scripts/train_headless.py            # setup + train
+  python scripts/train_headless.py --setup-only  # only create project folder
 """
 
 import argparse
@@ -32,16 +32,15 @@ CONFIG_DST  = PROJECT_DIR / "config.yaml"
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
 def setup_project():
-    print(f"[1/4] Proje klasörü oluşturuluyor: {PROJECT_DIR}")
+    print(f"[1/4] Creating project folder: {PROJECT_DIR}")
     LABELED_DIR.mkdir(parents=True, exist_ok=True)
     (PROJECT_DIR / "videos").mkdir(exist_ok=True)
     (PROJECT_DIR / "dlc-models").mkdir(exist_ok=True)
     (PROJECT_DIR / "evaluation-results").mkdir(exist_ok=True)
     (PROJECT_DIR / "training-datasets").mkdir(exist_ok=True)
 
-    print(f"[2/4] config.yaml kopyalanıyor ve project_path güncelleniyor")
+    print(f"[2/4] Copying config.yaml and updating project_path")
     config_text = CONFIG_SRC.read_text()
-    # project_path satırını mevcut makineye göre güncelle
     import re
     config_text = re.sub(
         r"project_path:.*",
@@ -51,12 +50,11 @@ def setup_project():
     CONFIG_DST.write_text(config_text)
     print(f"   project_path → {PROJECT_DIR}")
 
-    print(f"[3/4] Resimler {IMAGES_SRC} → {LABELED_DIR}")
+    print(f"[3/4] Copying images {IMAGES_SRC} → {LABELED_DIR}")
     if not IMAGES_SRC.exists():
-        print(f"   HATA: {IMAGES_SRC} bulunamadı!", file=sys.stderr)
+        print(f"   ERROR: {IMAGES_SRC} not found!", file=sys.stderr)
         sys.exit(1)
 
-    # CSV'deki frame isimlerini oku; sadece etiketli resimleri kopyala
     import pandas as pd
     df = pd.read_csv(CSV_SRC, header=[0, 1, 2], index_col=[0, 1, 2])
     labeled_frames = [idx[2] for idx in df.index]
@@ -75,19 +73,19 @@ def setup_project():
         else:
             missing.append(fname)
 
-    print(f"   {copied} resim kopyalandı, {len(missing)} eksik")
+    print(f"   {copied} images copied, {len(missing)} missing")
     if missing:
-        print("   Eksik resimler:", missing[:5], "..." if len(missing) > 5 else "")
+        print("   Missing:", missing[:5], "..." if len(missing) > 5 else "")
 
-    print(f"[4/4] CSV ve H5 oluşturuluyor → {LABELED_DIR}")
+    print(f"[4/4] Writing CSV and H5 → {LABELED_DIR}")
     csv_dst = LABELED_DIR / "CollectedData_furkan.csv"
     shutil.copy2(CSV_SRC, csv_dst)
 
     h5_dst = LABELED_DIR / "CollectedData_furkan.h5"
     df.to_hdf(h5_dst, key="df_with_missing", mode="w")
-    print(f"   H5 yazıldı: {h5_dst}")
+    print(f"   H5 written: {h5_dst}")
 
-    print(f"\nKurulum tamam. Config: {CONFIG_DST}")
+    print(f"\nSetup complete. Config: {CONFIG_DST}")
     return str(CONFIG_DST)
 
 
@@ -107,10 +105,10 @@ def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
         max_snapshots_to_keep=max_snapshots,
         displayiters=500,
         saveiters=2000,
-        maxiters=200_000,
+        # maxiters == 200_000 means 200 epoch, multiply it with 5 to get 1000 epochs
+        maxiters=200_000*5,
         allow_growth=True,
     )
-
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -118,14 +116,14 @@ def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--setup-only", action="store_true",
-                        help="Sadece proje klasörünü kur, eğitimi başlatma")
+                        help="Only create project folder, do not train")
     parser.add_argument("--shuffle", type=int, default=1)
     args = parser.parse_args()
 
     config_path = setup_project()
 
     if args.setup_only:
-        print("\nKurulum tamamlandı. Eğitim için '--setup-only' olmadan tekrar çalıştır.")
+        print("\nSetup complete. Run without --setup-only to start training.")
         return
 
     train(config_path, shuffle=args.shuffle)
