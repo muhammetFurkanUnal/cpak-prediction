@@ -23,7 +23,7 @@ def find_snapshots() -> list[pathlib.Path]:
     if not TRAIN_DIR.exists():
         return []
     all_pts = [p for p in TRAIN_DIR.glob("*.pt") if re.search(r"\d+", p.stem)]
-    return sorted(all_pts, key=lambda p: int(re.search(r"(\d+)", p.stem).group()))
+    return sorted(all_pts, key=lambda p: p.stem)  # DLC ile aynı: alfabetik
 
 
 def list_snapshots():
