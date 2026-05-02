@@ -111,8 +111,6 @@ def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
         allow_growth=True,
     )
 
-    print("\n── evaluate_network ─────────────────────────────────────────────────")
-    deeplabcut.evaluate_network(config_path, shuffle=[shuffle], plotting=False)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
