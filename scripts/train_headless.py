@@ -97,7 +97,7 @@ def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
     import deeplabcut
 
     print("\n── create_training_dataset ──────────────────────────────────────────")
-    deeplabcut.create_training_dataset(config_path, shuffle=shuffle)
+    deeplabcut.create_training_dataset(config_path, num_shuffles=1, Shuffles=[shuffle])
 
     print("\n── train_network ────────────────────────────────────────────────────")
     deeplabcut.train_network(
