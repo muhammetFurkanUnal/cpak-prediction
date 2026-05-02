@@ -27,7 +27,7 @@ def main():
     deeplabcut.evaluate_network(
         config_path,
         Shuffles=[args.shuffle],
-        plotting=False,
+        plotting=True,
     )
 
 
