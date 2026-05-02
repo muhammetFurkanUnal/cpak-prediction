@@ -5,6 +5,8 @@ __pycache__
 
 cpak-furkan-2026-04-29
 
+kneeap-furkan-2026-04-29
+
 notebooks/out/inference/*
 !notebooks/out/inference/.gitkeep
 
