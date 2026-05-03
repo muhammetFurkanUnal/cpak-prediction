@@ -2,9 +2,6 @@
 __pycache__
 .claude
 
-
-cpak-furkan-2026-04-29
-
 kneeap-furkan-2026-04-29
 
 notebooks/out/inference/*
@@ -31,4 +28,4 @@ videos/*
 !videos/.gitkeep
 
 # config.yaml'daki project_path kullanıcıya özel; template kalsın
-# (opsiyonel: config.yaml'ı da ignore edip config.yaml.example kullanabilirsiniz)
+# (opsiyonel: config.yaml'ı da ignore edip config.yaml.example kullanabilirsiniz)cpak-furkan-2026-04-29
