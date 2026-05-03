@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import re
 import shutil
 import pathlib
 import sys
@@ -96,8 +97,25 @@ def shuffle_exists(shuffle: int) -> bool:
     return any(td.rglob(f"*shuffle{shuffle}*")) if td.exists() else False
 
 
-# In this project's setup, ~1000 iterations correspond to 1 epoch.
-ITERS_PER_EPOCH = 1000
+def find_pytorch_config(shuffle: int):
+    """Locate the pytorch_config.yaml for a given shuffle."""
+    matches = list((PROJECT_DIR / "dlc-models-pytorch").rglob(
+        f"*shuffle{shuffle}/train/pytorch_config.yaml"))
+    return matches[0] if matches else None
+
+
+def set_pytorch_epochs(shuffle: int, epochs: int):
+    cfg_path = find_pytorch_config(shuffle)
+    if not cfg_path:
+        print(f"   WARN: pytorch_config.yaml not found for shuffle {shuffle}")
+        return
+    text = cfg_path.read_text()
+    new_text, n = re.subn(r"^epochs:.*$", f"epochs: {epochs}", text, flags=re.MULTILINE)
+    if n == 0:
+        print(f"   WARN: 'epochs:' line not found in {cfg_path}")
+        return
+    cfg_path.write_text(new_text)
+    print(f"   epochs: {epochs} written to {cfg_path.relative_to(PROJECT_DIR)}")
 
 
 def train(config_path: str, shuffle: int = 1, epochs: int = 1000, max_snapshots: int = 5):
@@ -106,10 +124,10 @@ def train(config_path: str, shuffle: int = 1, epochs: int = 1000, max_snapshots:
         print("Create it first:  python scripts/shuffles_headless.py create")
         sys.exit(1)
 
-    import deeplabcut
+    set_pytorch_epochs(shuffle, epochs)
 
-    maxiters = epochs * ITERS_PER_EPOCH
-    print(f"\n── train_network ({epochs} epochs ≈ {maxiters} iters) ───────────────")
+    import deeplabcut
+    print(f"\n── train_network ({epochs} epochs) ──────────────────────────────────")
     deeplabcut.train_network(
         config_path,
         shuffle=shuffle,
@@ -117,7 +135,6 @@ def train(config_path: str, shuffle: int = 1, epochs: int = 1000, max_snapshots:
         max_snapshots_to_keep=max_snapshots,
         displayiters=500,
         saveiters=2000,
-        maxiters=maxiters,
         allow_growth=True,
     )
 
