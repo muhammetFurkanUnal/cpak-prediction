@@ -93,17 +93,16 @@ def setup_project():
 
 def shuffle_exists(shuffle: int) -> bool:
     td = PROJECT_DIR / "training-datasets"
-    return any(td.glob(f"*shuffle{shuffle}*")) if td.exists() else False
+    return any(td.rglob(f"*shuffle{shuffle}*")) if td.exists() else False
 
 
 def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
-    import deeplabcut
+    if not shuffle_exists(shuffle):
+        print(f"\nERROR: shuffle {shuffle} does not exist.")
+        print("Create it first:  python scripts/shuffles_headless.py create")
+        sys.exit(1)
 
-    print("\n── create_training_dataset ──────────────────────────────────────────")
-    if shuffle_exists(shuffle):
-        print(f"   Shuffle {shuffle} already exists, skipping create_training_dataset")
-    else:
-        deeplabcut.create_training_dataset(config_path, num_shuffles=1, Shuffles=[shuffle])
+    import deeplabcut
 
     print("\n── train_network ────────────────────────────────────────────────────")
     deeplabcut.train_network(
