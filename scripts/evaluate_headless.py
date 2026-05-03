@@ -14,21 +14,26 @@ import re
 
 REPO_ROOT   = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_PATH = REPO_ROOT / "kneeap-furkan-2026-04-29" / "config.yaml"
-TRAIN_DIR   = (REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models-pytorch"
-               / "iteration-0" / "kneeapApr29-trainset95shuffle1" / "train")
+DLC_MODELS  = REPO_ROOT / "kneeap-furkan-2026-04-29" / "dlc-models-pytorch"
 
 
-def find_snapshots() -> list[pathlib.Path]:
-    if not TRAIN_DIR.exists():
+def get_train_dir(shuffle: int) -> pathlib.Path | None:
+    matches = list(DLC_MODELS.glob(f"**/iteration-*/*shuffle{shuffle}/train"))
+    return matches[0] if matches else None
+
+
+def find_snapshots(shuffle: int) -> list[pathlib.Path]:
+    train_dir = get_train_dir(shuffle)
+    if not train_dir:
         return []
-    pts = [p for p in TRAIN_DIR.glob("*.pt") if re.search(r"\d+", p.stem)]
+    pts = [p for p in train_dir.glob("*.pt") if re.search(r"\d+", p.stem)]
     return sorted(pts, key=lambda p: p.stem)  # alphabetical, same as DLC
 
 
-def list_snapshots():
-    snapshots = find_snapshots()
+def list_snapshots(shuffle: int):
+    snapshots = find_snapshots(shuffle)
     if not snapshots:
-        print("No snapshots found.")
+        print(f"No snapshots found for shuffle {shuffle}.")
         return
     print(f"{'Index':<6} {'File'}")
     print("-" * 40)
@@ -38,9 +43,10 @@ def list_snapshots():
 
 
 @contextlib.contextmanager
-def hide_best_snapshot():
+def hide_best_snapshot(shuffle: int):
     """Temporarily hides snapshot-best-* so DLC is forced to use a numbered snapshot."""
-    best_files = list(TRAIN_DIR.glob("snapshot-best-*.pt"))
+    train_dir = get_train_dir(shuffle)
+    best_files = list(train_dir.glob("snapshot-best-*.pt")) if train_dir else []
     hidden = []
     for f in best_files:
         tmp = f.with_suffix(".pt.hidden")
@@ -70,7 +76,7 @@ def main():
     args = parser.parse_args()
 
     if args.list:
-        list_snapshots()
+        list_snapshots(args.shuffle)
         return
 
     import matplotlib
@@ -80,7 +86,7 @@ def main():
     config_path = str(CONFIG_PATH)
 
     if args.snapshot_index is not None:
-        snapshots = find_snapshots()
+        snapshots = find_snapshots(args.shuffle)
         non_best = [s for s in snapshots if "best" not in s.stem]
         try:
             chosen = non_best[args.snapshot_index]
@@ -90,7 +96,7 @@ def main():
         print(f"Selected snapshot: {chosen.name}")
         dlc_index = snapshots.index(chosen)
         set_snapshot_index(dlc_index)
-        with hide_best_snapshot():
+        with hide_best_snapshot(args.shuffle):
             deeplabcut.evaluate_network(config_path, Shuffles=[args.shuffle], plotting=True)
     else:
         # default: let DLC pick (snapshot-best-*)

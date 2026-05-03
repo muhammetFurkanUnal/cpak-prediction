@@ -91,28 +91,19 @@ def setup_project():
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
-def clean_shuffle(shuffle: int):
-    """Removes existing shuffle data so create_training_dataset can run fresh."""
-    import shutil
-    removed = []
-
-    for folder in (PROJECT_DIR / "training-datasets").glob(f"*shuffle{shuffle}*"):
-        shutil.rmtree(folder)
-        removed.append(folder)
-    for folder in (PROJECT_DIR / "dlc-models-pytorch").glob(f"**/*shuffle{shuffle}*"):
-        shutil.rmtree(folder, ignore_errors=True)
-        removed.append(folder)
-
-    if removed:
-        print(f"   Removed {len(removed)} existing shuffle {shuffle} folders")
+def shuffle_exists(shuffle: int) -> bool:
+    td = PROJECT_DIR / "training-datasets"
+    return any(td.glob(f"*shuffle{shuffle}*")) if td.exists() else False
 
 
 def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
     import deeplabcut
 
     print("\n── create_training_dataset ──────────────────────────────────────────")
-    clean_shuffle(shuffle)
-    deeplabcut.create_training_dataset(config_path, num_shuffles=1, Shuffles=[shuffle])
+    if shuffle_exists(shuffle):
+        print(f"   Shuffle {shuffle} already exists, skipping create_training_dataset")
+    else:
+        deeplabcut.create_training_dataset(config_path, num_shuffles=1, Shuffles=[shuffle])
 
     print("\n── train_network ────────────────────────────────────────────────────")
     deeplabcut.train_network(
