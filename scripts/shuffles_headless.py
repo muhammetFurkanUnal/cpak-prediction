@@ -52,11 +52,15 @@ def delete_shuffle(idx: int):
         if not root.exists():
             continue
         for path in root.rglob(f"*shuffle{idx}*"):
-            if path.exists():
-                shutil.rmtree(path, ignore_errors=True)
-                deleted.append(path)
+            if not path.exists():
+                continue
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            deleted.append(path)
     if deleted:
-        print(f"Deleted shuffle {idx} ({len(deleted)} folders):")
+        print(f"Deleted shuffle {idx} ({len(deleted)} entries):")
         for p in deleted:
             print(f"  - {p.relative_to(PROJECT_DIR)}")
     else:
