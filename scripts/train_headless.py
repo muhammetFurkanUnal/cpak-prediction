@@ -13,7 +13,6 @@ Usage:
 """
 
 import argparse
-import re
 import shutil
 import pathlib
 import sys
@@ -97,45 +96,23 @@ def shuffle_exists(shuffle: int) -> bool:
     return any(td.rglob(f"*shuffle{shuffle}*")) if td.exists() else False
 
 
-def find_pytorch_config(shuffle: int):
-    """Locate the pytorch_config.yaml for a given shuffle."""
-    matches = list((PROJECT_DIR / "dlc-models-pytorch").rglob(
-        f"*shuffle{shuffle}/train/pytorch_config.yaml"))
-    return matches[0] if matches else None
-
-
-def set_pytorch_epochs(shuffle: int, epochs: int):
-    cfg_path = find_pytorch_config(shuffle)
-    if not cfg_path:
-        print(f"   WARN: pytorch_config.yaml not found for shuffle {shuffle}")
-        return
-    text = cfg_path.read_text()
-    new_text, n = re.subn(r"^epochs:.*$", f"epochs: {epochs}", text, flags=re.MULTILINE)
-    if n == 0:
-        print(f"   WARN: 'epochs:' line not found in {cfg_path}")
-        return
-    cfg_path.write_text(new_text)
-    print(f"   epochs: {epochs} written to {cfg_path.relative_to(PROJECT_DIR)}")
-
-
 def train(config_path: str, shuffle: int = 1, epochs: int = 1000, max_snapshots: int = 5):
     if not shuffle_exists(shuffle):
         print(f"\nERROR: shuffle {shuffle} does not exist.")
         print("Create it first:  python scripts/shuffles_headless.py create")
         sys.exit(1)
 
-    set_pytorch_epochs(shuffle, epochs)
-
     import deeplabcut
     print(f"\n── train_network ({epochs} epochs) ──────────────────────────────────")
+    # NOTE: PyTorch backend ignores maxiters; epochs= is the authoritative kwarg
+    # and it overwrites pytorch_config.yaml on disk via update_model_cfg.
     deeplabcut.train_network(
         config_path,
         shuffle=shuffle,
         trainingsetindex=0,
+        epochs=epochs,
+        save_epochs=max(1, epochs // 20),
         max_snapshots_to_keep=max_snapshots,
-        displayiters=500,
-        saveiters=2000,
-        allow_growth=True,
     )
 
 
