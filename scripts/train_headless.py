@@ -96,7 +96,11 @@ def shuffle_exists(shuffle: int) -> bool:
     return any(td.rglob(f"*shuffle{shuffle}*")) if td.exists() else False
 
 
-def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
+# In this project's setup, ~1000 iterations correspond to 1 epoch.
+ITERS_PER_EPOCH = 1000
+
+
+def train(config_path: str, shuffle: int = 1, epochs: int = 1000, max_snapshots: int = 5):
     if not shuffle_exists(shuffle):
         print(f"\nERROR: shuffle {shuffle} does not exist.")
         print("Create it first:  python scripts/shuffles_headless.py create")
@@ -104,7 +108,8 @@ def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
 
     import deeplabcut
 
-    print("\n── train_network ────────────────────────────────────────────────────")
+    maxiters = epochs * ITERS_PER_EPOCH
+    print(f"\n── train_network ({epochs} epochs ≈ {maxiters} iters) ───────────────")
     deeplabcut.train_network(
         config_path,
         shuffle=shuffle,
@@ -112,8 +117,7 @@ def train(config_path: str, shuffle: int = 1, max_snapshots: int = 5):
         max_snapshots_to_keep=max_snapshots,
         displayiters=500,
         saveiters=2000,
-        # maxiters == 200_000 means 200 epoch, multiply it with 5 to get 1000 epochs
-        maxiters=200_000*5,
+        maxiters=maxiters,
         allow_growth=True,
     )
 
@@ -125,6 +129,8 @@ def main():
     parser.add_argument("--setup-only", action="store_true",
                         help="Only create project folder, do not train")
     parser.add_argument("--shuffle", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=1000,
+                        help="Number of epochs to train (default: 1000)")
     args = parser.parse_args()
 
     config_path = setup_project()
@@ -133,7 +139,7 @@ def main():
         print("\nSetup complete. Run without --setup-only to start training.")
         return
 
-    train(config_path, shuffle=args.shuffle)
+    train(config_path, shuffle=args.shuffle, epochs=args.epochs)
 
 
 if __name__ == "__main__":
