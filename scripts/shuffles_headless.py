@@ -59,6 +59,12 @@ def delete_shuffle(idx: int):
             else:
                 path.unlink()
             deleted.append(path)
+
+    # Drop DLC's shuffle registry; it will be rebuilt from remaining pickles.
+    for meta in (PROJECT_DIR / "training-datasets").rglob("metadata.yaml"):
+        meta.unlink()
+        deleted.append(meta)
+
     if deleted:
         print(f"Deleted shuffle {idx} ({len(deleted)} entries):")
         for p in deleted:
