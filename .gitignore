@@ -2,6 +2,8 @@
 __pycache__
 .claude
 
+temp
+
 kneeap-furkan-2026-04-29
 cpak-furkan-2026-04-13
 
@@ -13,6 +15,9 @@ notebooks/out/test/*
 
 notebooks/out/models/*
 !notebooks/out/models/.gitkeep
+
+notebooks/models/*
+!notebooks/models/.gitkeep
 
 data/*
 !data/.gitkeep

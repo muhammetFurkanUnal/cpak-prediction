@@ -27,7 +27,12 @@ def find_snapshots(shuffle: int) -> list[pathlib.Path]:
     if not train_dir:
         return []
     pts = [p for p in train_dir.glob("*.pt") if re.search(r"\d+", p.stem)]
-    return sorted(pts, key=lambda p: p.stem)  # alphabetical, same as DLC
+    # DLC sorts numerically by iteration; "best" is special-cased to last.
+    def key(p: pathlib.Path):
+        n = int(re.search(r"(\d+)", p.stem).group())
+        is_best = "best" in p.stem
+        return (is_best, n)
+    return sorted(pts, key=key)
 
 
 def list_snapshots(shuffle: int):
