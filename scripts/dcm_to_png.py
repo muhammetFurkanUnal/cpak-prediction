@@ -1,3 +1,22 @@
+"""
+Convert all DICOM (.dcm) files in a folder to PNG.
+
+Usage:
+    python dcm_to_png.py <input_folder>
+
+Args:
+    input_folder: Path to a directory containing .dcm files (non-recursive).
+
+Output:
+    Writes PNGs to a `png/` directory created in the current working directory.
+    Each file keeps its original basename, with the extension replaced by .png.
+    Pixel values are min-clipped at 0 and rescaled per-image to 0-255 (uint8).
+
+Example:
+    python dcm_to_png.py ./raw_dicoms
+    # -> creates ./png/<name>.png for every ./raw_dicoms/<name>.dcm
+"""
+
 import os
 import argparse
 import pydicom

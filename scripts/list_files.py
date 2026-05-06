@@ -1,3 +1,27 @@
+"""
+Recursively list every file under a directory, writing relative paths to out.txt.
+
+Walks the tree rooted at <root_directory> and writes each file's path
+(relative to that root) on its own line. Directories themselves are not
+written; only files. Hidden files are included.
+
+Usage:
+    python list_files.py <root_directory>
+
+Args:
+    root_directory: Directory to scan recursively.
+
+Output:
+    out.txt in the current working directory (overwritten if it exists).
+
+Example:
+    python list_files.py ./data
+    # out.txt:
+    #   raw/0.png
+    #   raw/1.png
+    #   labels/0.json
+"""
+
 import os
 import sys
 

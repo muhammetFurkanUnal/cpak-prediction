@@ -1,3 +1,23 @@
+"""
+Anonymize files in a folder by renaming them to sequential integers.
+
+Files are sorted alphabetically, then renamed in place to `<start>.<ext>`,
+`<start+1>.<ext>`, ... keeping each file's original extension. Subdirectories
+are ignored. The operation is destructive (in-place rename) — back up first
+if you need to keep original filenames.
+
+Usage:
+    python anonymalize.py <folder> <start>
+
+Args:
+    folder: Directory containing the files to rename (non-recursive).
+    start:  Integer to start numbering from (e.g. 0, 100, 1000).
+
+Example:
+    python anonymalize.py ./png 0
+    # a.png, b.png, c.png  ->  0.png, 1.png, 2.png
+"""
+
 import os
 import argparse
 
