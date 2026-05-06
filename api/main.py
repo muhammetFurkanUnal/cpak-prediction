@@ -7,9 +7,10 @@ Run with:
 Endpoints
 ---------
 GET  /health                          – liveness check
-GET  /models                          – list available ONNX models
+GET  /models                          – list available ONNX models with their kind
 POST /infer/{model_name}              – run inference, return JSON
-POST /infer/{model_name}/visualize    – run inference, return annotated image (JPEG)
+POST /infer/{model_name}/visualize    – run inference, return annotated image (PNG)
+POST /infer/{model_name}/landmarks    – return landmark-only annotated image (PNG)
 """
 
 import sys
@@ -25,20 +26,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from api.model_registry import get_session, list_models
-from api.schemas import InferenceResponse, Keypoint, OrthopedicAngles
-from notebooks.lib.inference import (
-    compute_orthopedic_metrics,
-    draw_lines,
-    extract_coordinates,
-    get_predictions,
-    visualize_predictions,
+from api.model_registry import get_session, list_models, model_kind
+from api.schemas import (
+    CpakAngles,
+    CpakResponse,
+    InferenceResponse,
+    KneeApAngles,
+    KneeApResponse,
+    Keypoint,
 )
+from notebooks.lib import cpak_inference, kneeap_inference
 
 app = FastAPI(
     title="cpak Inference API",
     description="Ortopedik landmark tespiti ve mekanik açı hesaplama.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -66,15 +68,47 @@ async def _read_image(upload: UploadFile) -> np.ndarray:
     return img
 
 
-def _build_response(model_name: str, coords, metrics_raw) -> InferenceResponse:
+def _resolve_session(model_name: str):
+    try:
+        return get_session(model_name)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+def _run_inference(model_name: str, img: np.ndarray):
+    """
+    Dispatch to the right inference module based on the model kind.
+
+    Returns (kind, coords, metrics_raw).
+    """
+    kind = model_kind(model_name)
+    session = _resolve_session(model_name)
+    module = kneeap_inference if kind == "kneeap" else cpak_inference
+
+    heatmap, offset = module.get_predictions(session, img)
+    coords = module.extract_coordinates(heatmap, offset)
+    if kind == "kneeap":
+        metrics_raw = kneeap_inference.compute_kneeap_metrics(coords)
+    else:
+        metrics_raw = cpak_inference.compute_orthopedic_metrics(coords)
+    return kind, coords, metrics_raw
+
+
+def _build_response(model_name: str, kind: str, coords, metrics_raw) -> InferenceResponse:
     keypoints = [
         Keypoint(joint_id=i, x=float(x), y=float(y), confidence=float(conf))
         for i, (x, y, conf) in enumerate(coords)
     ]
-    return InferenceResponse(
+    if kind == "kneeap":
+        return KneeApResponse(
+            model=model_name,
+            keypoints=keypoints,
+            metrics=KneeApAngles(jlca=float(metrics_raw["jlca"])),
+        )
+    return CpakResponse(
         model=model_name,
         keypoints=keypoints,
-        metrics=OrthopedicAngles(
+        metrics=CpakAngles(
             femur_mech_angle_notch=metrics_raw["femur_mech_angle_notch"],
             tibia_mech_angle_inter=metrics_raw["tibia_mech_angle_inter"],
         ),
@@ -87,7 +121,12 @@ def _build_response(model_name: str, coords, metrics_raw) -> InferenceResponse:
 
 @app.get("/", include_in_schema=False)
 def root():
-    return FileResponse(str(_FRONTEND / "index.html"))
+    # no-store on the entry HTML so users always pick up the latest static asset
+    # versions (the JS files themselves can still be cached by the browser).
+    return FileResponse(
+        str(_FRONTEND / "index.html"),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/health")
@@ -102,59 +141,28 @@ def models():
 
 @app.post("/infer/{model_name}", response_model=InferenceResponse)
 async def infer(model_name: str, image: UploadFile = File(...)):
-    """
-    Run inference on a single X-ray image.
-
-    Returns 27 landmark keypoints and the four ortopedik mekanik açılar.
-    """
-    try:
-        session = get_session(model_name)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
     img = await _read_image(image)
-    heatmap, offset = get_predictions(session, img)
-    coords = extract_coordinates(heatmap, offset)
-    metrics_raw = compute_orthopedic_metrics(coords)
-
-    return _build_response(model_name, coords, metrics_raw)
+    kind, coords, metrics_raw = _run_inference(model_name, img)
+    return _build_response(model_name, kind, coords, metrics_raw)
 
 
 @app.post("/infer/{model_name}/visualize")
 async def infer_visualize(model_name: str, image: UploadFile = File(...)):
-    """
-    Run inference and return an annotated JPEG with landmarks and mechanical axes drawn.
-    """
-    try:
-        session = get_session(model_name)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    """Run inference and return an annotated PNG with landmarks and axes drawn."""
     img = await _read_image(image)
-    heatmap, offset = get_predictions(session, img)
-    coords = extract_coordinates(heatmap, offset)
-    metrics_raw = compute_orthopedic_metrics(coords)
-
-    annotated = draw_lines(img, metrics_raw, coords)
+    kind, coords, metrics_raw = _run_inference(model_name, img)
+    module = kneeap_inference if kind == "kneeap" else cpak_inference
+    annotated = module.draw_lines(img, metrics_raw, coords)
     _, buffer = cv2.imencode(".png", annotated)
     return Response(content=buffer.tobytes(), media_type="image/png")
 
 
 @app.post("/infer/{model_name}/landmarks")
 async def infer_landmarks(model_name: str, image: UploadFile = File(...)):
-    """
-    Run inference and return an annotated JPEG showing only the raw landmark points
-    (without mechanical axis lines).
-    """
-    try:
-        session = get_session(model_name)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    """Run inference and return an annotated PNG showing only the raw landmark points."""
     img = await _read_image(image)
-    heatmap, offset = get_predictions(session, img)
-    coords = extract_coordinates(heatmap, offset)
-
-    annotated = visualize_predictions(img, coords, threshold=0.0)
+    kind, coords, _ = _run_inference(model_name, img)
+    module = kneeap_inference if kind == "kneeap" else cpak_inference
+    annotated = module.visualize_predictions(img, coords, threshold=0.0)
     _, buffer = cv2.imencode(".png", annotated)
     return Response(content=buffer.tobytes(), media_type="image/png")

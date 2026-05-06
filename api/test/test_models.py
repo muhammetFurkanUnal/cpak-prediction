@@ -14,4 +14,8 @@ assert resp.status_code == 200, "Expected 200"
 models = resp.json().get("models", [])
 assert isinstance(models, list), "Expected 'models' to be a list"
 assert len(models) > 0, "No models returned — check notebooks/out/models/"
+for m in models:
+    assert isinstance(m, dict) and "name" in m and "kind" in m, \
+        f"Each model entry must be {{name, kind}}, got {m!r}"
+    assert m["kind"] in ("cpak", "kneeap"), f"Unknown kind: {m['kind']!r}"
 print("PASS")

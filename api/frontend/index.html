@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
 <body>
 <div class="app">
@@ -68,10 +68,6 @@
           <span id="btn-label">Run Inference</span>
         </button>
         <button class="btn btn-ghost" id="clear-btn">Clear</button>
-        <div id="model-info" style="display:none; padding:10px; background:var(--surface); border-radius:8px; border:1px solid var(--border);">
-          <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Active Model</div>
-          <div id="model-name-display" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent);"></div>
-        </div>
       </div>
 
     </div><!-- /top-grid -->
@@ -101,6 +97,25 @@
               <span class="result-badge badge-vis">visualize</span>
             </div>
           </div>
+          <!-- KneeAP side panel (shown for knee AP models) -->
+          <div class="cpak-panel" id="kneeap-panel">
+            <button class="cpak-tab" id="kneeap-tab" title="Toggle JLCA panel">
+              <svg class="cpak-tab-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+            <div class="cpak-content">
+              <div class="cpak-panel-header">
+                <span class="cpak-panel-title">Knee AP Analysis</span>
+              </div>
+              <div class="cpak-type-hero">
+                <div class="cpak-type-label">JLCA</div>
+                <div class="cpak-type-value" id="kneeap-jlca-value">—</div>
+              </div>
+              <div class="cpak-hint" style="padding:14px 18px;">Joint line convergence angle</div>
+            </div>
+          </div>
+
           <!-- CPAK classification side panel -->
           <div class="cpak-panel" id="cpak-panel">
             <!-- Arrow tab — always visible on the right edge of the panel -->
@@ -169,10 +184,11 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="/static/viewer.js"></script>
-<script src="/static/cpak.js"></script>
-<script src="/static/canvas.js"></script>
-<script src="/static/overlay.js"></script>
-<script src="/static/app.js"></script>
+<script src="/static/viewer.js?v=4"></script>
+<script src="/static/cpak.js?v=4"></script>
+<script src="/static/canvas.js?v=4"></script>
+<script src="/static/overlay.js?v=4"></script>
+<script src="/static/kneeap_overlay.js?v=4"></script>
+<script src="/static/app.js?v=4"></script>
 </body>
 </html>

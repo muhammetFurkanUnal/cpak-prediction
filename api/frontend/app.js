@@ -31,6 +31,8 @@ let visImgHeight       = 0;
 let currentViewer      = null;
 let currentAxesOverlay = null;
 let cpakPanelOpen      = false;
+let kneeapPanelOpen    = false;
+let modelKinds         = {};     // { modelName: 'cpak' | 'kneeap' }
 
 // ── DOM ────────────────────────────────────────────────────────────────────
 const appEl          = document.querySelector('.app');
@@ -51,8 +53,6 @@ const resultsSection = document.getElementById('results-section');
 const resultsGrid    = document.getElementById('results-grid');
 const visWrap        = document.getElementById('vis-wrap');
 const dlVis          = document.getElementById('dl-vis');
-const modelInfo      = document.getElementById('model-info');
-const modelNameDisp  = document.getElementById('model-name-display');
 const toast          = document.getElementById('toast');
 const navLoadBtn     = document.getElementById('nav-load-btn');
 const fabInput       = document.getElementById('fab-input');
@@ -66,6 +66,11 @@ const cpakJlo        = document.getElementById('cpak-jlo');
 const cpakAhkaCat    = document.getElementById('cpak-ahka-cat');
 const cpakJloCat     = document.getElementById('cpak-jlo-cat');
 const cpakMatrix     = document.getElementById('cpak-matrix');
+const kneeapPanel    = document.getElementById('kneeap-panel');
+const kneeapTab      = document.getElementById('kneeap-tab');
+const kneeapJlcaVal  = document.getElementById('kneeap-jlca-value');
+
+function currentKind() { return modelKinds[modelSelect.value] || 'cpak'; }
 
 // ── Health check ───────────────────────────────────────────────────────────
 async function checkHealth() {
@@ -79,8 +84,12 @@ async function checkHealth() {
 async function loadModels() {
   try {
     const data = await (await fetch(`${API}/models`)).json();
-    modelSelect.innerHTML = data.models.length
-      ? data.models.map(m => `<option value="${m}">${m}</option>`).join('')
+    // Normalize: backend returns [{name, kind}], older builds may return [string]
+    const items = data.models.map(m =>
+      typeof m === 'string' ? { name: m, kind: 'cpak' } : m);
+    modelKinds = Object.fromEntries(items.map(m => [m.name, m.kind]));
+    modelSelect.innerHTML = items.length
+      ? items.map(m => `<option value="${m.name}" data-kind="${m.kind}">${m.name}</option>`).join('')
       : '<option value="">No models found</option>';
     updateRunBtn();
   } catch {
@@ -130,6 +139,7 @@ function doClear() {
   topGrid.style.display = '';
   navLoadBtn.classList.remove('visible');
   closeCpakPanel();
+  closeKneeapPanel();
   resultsSection.style.display = 'none';
   resultsGrid.classList.remove('visible');
   appEl.classList.remove('map-view');
@@ -144,10 +154,7 @@ panelClearBtn.addEventListener('click', doClear);
 
 // ── Run state ──────────────────────────────────────────────────────────────
 function updateRunBtn() { runBtn.disabled = !selectedFile || !modelSelect.value; }
-modelSelect.addEventListener('change', () => {
-  updateRunBtn();
-  if (modelSelect.value) { modelInfo.style.display = 'block'; modelNameDisp.textContent = modelSelect.value; }
-});
+modelSelect.addEventListener('change', updateRunBtn);
 
 // ── Inference ──────────────────────────────────────────────────────────────
 runBtn.addEventListener('click', runInference);
@@ -155,54 +162,99 @@ runBtn.addEventListener('click', runInference);
 async function runInference() {
   if (!selectedFile || !modelSelect.value) return;
   const model = modelSelect.value;
+  const kind  = currentKind();
   setLoading(true);
   resultsSection.style.display = 'block';
   showImgLoading(visWrap);
 
   try {
-    const jsonResp = await postImage(`${API}/infer/${model}`, selectedFile);
-    if (!jsonResp.ok) throw new Error(await jsonResp.text());
-
-    const data = await jsonResp.json();
-    const { canvas, dotPositions, labelPositions, lw, imgHeight } =
-      await buildVisCanvas(selectedFile, data.keypoints, data.metrics);
-    visCanvas    = canvas;
-    visLw        = lw;
-    visImgHeight = imgHeight;
-
-    appEl.classList.add('map-view');
-    topGrid.style.display = 'none';
-    navLoadBtn.classList.add('visible');
-
-    const blob = await new Promise((res, rej) =>
-      canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
-    renderImage(blob, selectedFile.name);
-
-    requestAnimationFrame(() => {
-      resultsGrid.classList.add('visible');
-      if (currentViewer) {
-        currentViewer._fitToContainer();
-        currentAxesOverlay?.remove();
-        currentAxesOverlay = new AxesOverlay(visWrap, currentViewer, {
-          dots: dotPositions, labels: labelPositions, lw, imgHeight,
-        });
-
-        // Compute initial CPAK, populate panel and open it
-        const initAngles = computeAngles(currentAxesOverlay.dots);
-        if (initAngles) {
-          updateCpakPanel(classifyCPAK(initAngles.ldfa, initAngles.mpta));
-        }
-        openCpakPanel();
-
-        currentAxesOverlay.onAnglesChange = result => updateCpakPanel(result);
-      }
-    });
+    if (kind === 'kneeap') {
+      await runKneeapInference(model);
+    } else {
+      await runCpakInference(model);
+    }
   } catch (err) {
     showToast('Inference failed: ' + err.message);
     clearImgLoading(visWrap);
   } finally {
     setLoading(false);
   }
+}
+
+async function runCpakInference(model) {
+  const jsonResp = await postImage(`${API}/infer/${model}`, selectedFile);
+  if (!jsonResp.ok) throw new Error(await jsonResp.text());
+
+  const data = await jsonResp.json();
+  const { canvas, dotPositions, labelPositions, lw, imgHeight } =
+    await buildVisCanvas(selectedFile, data.keypoints, data.metrics);
+  visCanvas    = canvas;
+  visLw        = lw;
+  visImgHeight = imgHeight;
+
+  appEl.classList.add('map-view');
+  topGrid.style.display = 'none';
+  navLoadBtn.classList.add('visible');
+  closeKneeapPanel();
+
+  const blob = await new Promise((res, rej) =>
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+  renderImage(blob, selectedFile.name);
+
+  requestAnimationFrame(() => {
+    resultsGrid.classList.add('visible');
+    if (currentViewer) {
+      currentViewer._fitToContainer();
+      currentAxesOverlay?.remove();
+      currentAxesOverlay = new AxesOverlay(visWrap, currentViewer, {
+        dots: dotPositions, labels: labelPositions, lw, imgHeight,
+      });
+
+      const initAngles = computeAngles(currentAxesOverlay.dots);
+      if (initAngles) {
+        updateCpakPanel(classifyCPAK(initAngles.ldfa, initAngles.mpta));
+      }
+      openCpakPanel();
+
+      currentAxesOverlay.onAnglesChange = result => updateCpakPanel(result);
+    }
+  });
+}
+
+async function runKneeapInference(model) {
+  // Backend only supplies keypoints + JLCA; all drawing happens here.
+  const jsonResp = await postImage(`${API}/infer/${model}`, selectedFile);
+  if (!jsonResp.ok) throw new Error(await jsonResp.text());
+  const data = await jsonResp.json();
+
+  const { canvas, lw, imgHeight } = await buildKneeApVisCanvas(selectedFile);
+  visCanvas    = canvas;
+  visLw        = lw;
+  visImgHeight = imgHeight;
+
+  appEl.classList.add('map-view');
+  topGrid.style.display = 'none';
+  navLoadBtn.classList.add('visible');
+  closeCpakPanel();
+
+  const blob = await new Promise((res, rej) =>
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+  renderImage(blob, selectedFile.name);
+
+  requestAnimationFrame(() => {
+    resultsGrid.classList.add('visible');
+    if (currentViewer) {
+      currentViewer._fitToContainer();
+      currentAxesOverlay?.remove();
+      currentAxesOverlay = new KneeApOverlay(visWrap, currentViewer, {
+        keypoints: data.keypoints,
+        lw,
+        imgHeight,
+      });
+    }
+    kneeapJlcaVal.textContent = data.metrics.jlca.toFixed(2) + '°';
+    openKneeapPanel();
+  });
 }
 
 function postImage(url, file) {
@@ -225,7 +277,9 @@ function downloadWithLabels(stem) {
   dc.height = visCanvas.height;
   const ctx = dc.getContext('2d');
   ctx.drawImage(visCanvas, 0, 0);
-  if (currentAxesOverlay) {
+  if (currentAxesOverlay instanceof KneeApOverlay) {
+    drawKneeApAnnotationsOnContext(ctx, currentAxesOverlay.getKeypoints(), visLw);
+  } else if (currentAxesOverlay) {
     drawAxesOnContext(ctx, currentAxesOverlay.getDotPositions(), visLw, visImgHeight);
     drawLabelsOnCanvas(ctx, currentAxesOverlay.getLabelPositions(), visLw);
   }
@@ -320,6 +374,17 @@ function closeCpakPanel() {
 }
 
 cpakTab.addEventListener('click', () => cpakPanelOpen ? closeCpakPanel() : openCpakPanel());
+
+// ── KneeAP Panel ───────────────────────────────────────────────────────────
+function openKneeapPanel() {
+  kneeapPanelOpen = true;
+  kneeapPanel.classList.add('open');
+}
+function closeKneeapPanel() {
+  kneeapPanelOpen = false;
+  kneeapPanel.classList.remove('open');
+}
+kneeapTab.addEventListener('click', () => kneeapPanelOpen ? closeKneeapPanel() : openKneeapPanel());
 
 // ── Init ───────────────────────────────────────────────────────────────────
 checkHealth();

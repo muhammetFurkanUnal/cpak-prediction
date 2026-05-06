@@ -26,7 +26,8 @@ OUT_PATH   = str(OUT_DIR / "cpak_visualize.png")
 if len(sys.argv) > 2:
     MODEL = sys.argv[2]
 else:
-    MODEL = requests.get(f"{BASE_URL}/models").json()["models"][0]
+    first = requests.get(f"{BASE_URL}/models").json()["models"][0]
+    MODEL = first["name"] if isinstance(first, dict) else first
 
 print(f"Image  : {IMAGE_PATH}")
 print(f"Model  : {MODEL}")

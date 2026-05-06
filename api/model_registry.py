@@ -16,8 +16,21 @@ AVAILABLE_MODELS: dict[str, Path] = {p.stem: p for p in MODELS_DIR.glob("*.onnx"
 _sessions: dict[str, ort.InferenceSession] = {}
 
 
-def list_models() -> list[str]:
-    return sorted(AVAILABLE_MODELS.keys())
+def model_kind(name: str) -> str:
+    """
+    Classify a model file name into an inference pipeline kind.
+
+    'kneeap' → knee AP (single-joint) model with 30 landmarks, JLCA metric.
+    'cpak'   → full-leg model with 27 landmarks, LDFA/MPTA metrics.
+    """
+    return "kneeap" if name.lower().startswith("kneeap") else "cpak"
+
+
+def list_models() -> list[dict]:
+    return [
+        {"name": name, "kind": model_kind(name)}
+        for name in sorted(AVAILABLE_MODELS.keys())
+    ]
 
 
 def get_session(model_name: str) -> ort.InferenceSession:
@@ -32,7 +45,7 @@ def get_session(model_name: str) -> ort.InferenceSession:
     if model_name not in AVAILABLE_MODELS:
         raise KeyError(
             f"Model '{model_name}' not found. "
-            f"Available: {list_models()}"
+            f"Available: {sorted(AVAILABLE_MODELS.keys())}"
         )
 
     if model_name not in _sessions:

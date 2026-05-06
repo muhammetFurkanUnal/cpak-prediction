@@ -23,13 +23,14 @@ IMAGE_PATH = sys.argv[2] if len(sys.argv) > 2 else str(
     Path(__file__).parent.parent.parent / "data/samples-img/split-postop/4024.r.jpg"
 )
 
-# Pick model
+# Pick model. /models returns [{name, kind}] (older builds may return [str]).
 if len(sys.argv) > 3:
     MODEL = sys.argv[3]
 else:
     models_resp = requests.get(f"{BASE_URL}/models")
     models_resp.raise_for_status()
-    MODEL = models_resp.json()["models"][0]
+    first = models_resp.json()["models"][0]
+    MODEL = first["name"] if isinstance(first, dict) else first
 
 print(f"Image  : {IMAGE_PATH}")
 print(f"Model  : {MODEL}")
@@ -48,8 +49,16 @@ assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.te
 
 body = resp.json()
 assert body["model"] == MODEL
-assert len(body["keypoints"]) == 27, f"Expected 27 keypoints, got {len(body['keypoints'])}"
 assert "metrics" in body
+kind = body.get("kind", "cpak")
+expected_kp = 30 if kind == "kneeap" else 27
+assert len(body["keypoints"]) == expected_kp, \
+    f"Expected {expected_kp} keypoints for kind={kind}, got {len(body['keypoints'])}"
+if kind == "kneeap":
+    assert "jlca" in body["metrics"]
+else:
+    assert "femur_mech_angle_notch" in body["metrics"]
+    assert "tibia_mech_angle_inter" in body["metrics"]
 
 print("Keypoints (first 5):")
 for kp in body["keypoints"][:5]:
