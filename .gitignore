@@ -7,6 +7,11 @@ temp
 kneeap-furkan-2026-04-29
 cpak-furkan-2026-04-13
 
+yolo-knee-detect/*
+!yolo-knee-detect/export.py
+!yolo-knee-detect/infer.py
+!yolo-knee-detect/train.py
+
 notebooks/out/inference/*
 !notebooks/out/inference/.gitkeep
 
