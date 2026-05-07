@@ -14,9 +14,16 @@ class ImageViewer {
     this._rafId    = null;
     this.MIN_SCALE        = 0.1;
     this.MAX_SCALE        = 20;
-    this.onTransformChange = null;
+    this.onTransformChange = null;        // legacy single-listener slot (kept for back-compat)
+    this._transformListeners = [];        // multi-listener fan-out for dual overlays
     this.toolbar   = null;
     this.zoomBadge = null;
+  }
+
+  addTransformListener(fn) { this._transformListeners.push(fn); }
+  removeTransformListener(fn) {
+    const i = this._transformListeners.indexOf(fn);
+    if (i !== -1) this._transformListeners.splice(i, 1);
   }
 
   mountImage(img) {
@@ -229,6 +236,7 @@ class ImageViewer {
     this.container.style.setProperty('--grid-ox',   `${ox}px`);
     this.container.style.setProperty('--grid-oy',   `${oy}px`);
     if (this.onTransformChange) this.onTransformChange();
+    for (const fn of this._transformListeners) fn();
   }
 
   _updateBadge() {

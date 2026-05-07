@@ -26,12 +26,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from api.knee_detector import detect_two_knees
 from api.model_registry import get_session, list_models, model_kind
 from api.schemas import (
     CpakAngles,
+    CpakKneeSide,
     CpakResponse,
+    DualCpakResponse,
+    DualDetection,
+    DualInferenceResponse,
+    DualKneeApResponse,
     InferenceResponse,
     KneeApAngles,
+    KneeApKneeSide,
     KneeApResponse,
     Keypoint,
 )
@@ -155,6 +162,95 @@ async def infer_visualize(model_name: str, image: UploadFile = File(...)):
     annotated = module.draw_lines(img, metrics_raw, coords)
     _, buffer = cv2.imencode(".png", annotated)
     return Response(content=buffer.tobytes(), media_type="image/png")
+
+
+def _infer_half(model_name: str, kind: str, half_img: np.ndarray, x_offset: int):
+    """Run inference on a cropped half-image and offset keypoints back to original coords."""
+    session = _resolve_session(model_name)
+    module = kneeap_inference if kind == "kneeap" else cpak_inference
+
+    heatmap, offset = module.get_predictions(session, half_img)
+    coords = module.extract_coordinates(heatmap, offset)
+    # coords: list of [x, y, conf] — shift x by x_offset so they live in original-image space
+    coords_shifted = [(float(x) + x_offset, float(y), float(c)) for (x, y, c) in coords]
+
+    if kind == "kneeap":
+        metrics_raw = kneeap_inference.compute_kneeap_metrics(coords_shifted)
+    else:
+        metrics_raw = cpak_inference.compute_orthopedic_metrics(coords_shifted)
+    return coords_shifted, metrics_raw
+
+
+def _build_side(kind: str, coords, metrics_raw):
+    keypoints = [
+        Keypoint(joint_id=i, x=float(x), y=float(y), confidence=float(conf))
+        for i, (x, y, conf) in enumerate(coords)
+    ]
+    if kind == "kneeap":
+        return KneeApKneeSide(
+            keypoints=keypoints,
+            metrics=KneeApAngles(jlca=float(metrics_raw["jlca"])),
+        )
+    return CpakKneeSide(
+        keypoints=keypoints,
+        metrics=CpakAngles(
+            femur_mech_angle_notch=metrics_raw["femur_mech_angle_notch"],
+            tibia_mech_angle_inter=metrics_raw["tibia_mech_angle_inter"],
+        ),
+    )
+
+
+@app.post("/infer/{model_name}/dual", response_model=DualInferenceResponse)
+async def infer_dual(model_name: str, image: UploadFile = File(...)):
+    """
+    Detect both knees with YOLO, split the image at the midpoint between them,
+    and run the chosen landmark model on each half. Keypoints are returned
+    in the ORIGINAL image's pixel coordinates (right-side keypoints are
+    pre-offset by split_x), so the frontend can draw both overlays on the
+    un-cropped image without any further coordinate math.
+    """
+    img = await _read_image(image)
+    kind = model_kind(model_name)
+    _resolve_session(model_name)  # validate model name early
+
+    try:
+        det = detect_two_knees(img)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    split_x = det["split_x"]
+    h, w = img.shape[:2]
+    if not (0 < split_x < w):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Detected split_x={split_x} is outside image width {w}.",
+        )
+
+    left_half  = img[:, :split_x]
+    right_half = img[:, split_x:]
+
+    left_coords,  left_metrics  = _infer_half(model_name, kind, left_half,  x_offset=0)
+    right_coords, right_metrics = _infer_half(model_name, kind, right_half, x_offset=split_x)
+
+    detection = DualDetection(left=det["left"], right=det["right"])
+
+    if kind == "kneeap":
+        return DualKneeApResponse(
+            model=model_name,
+            split_x=split_x,
+            detection=detection,
+            left=_build_side(kind, left_coords, left_metrics),
+            right=_build_side(kind, right_coords, right_metrics),
+        )
+    return DualCpakResponse(
+        model=model_name,
+        split_x=split_x,
+        detection=detection,
+        left=_build_side(kind, left_coords, left_metrics),
+        right=_build_side(kind, right_coords, right_metrics),
+    )
 
 
 @app.post("/infer/{model_name}/landmarks")

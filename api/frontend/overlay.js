@@ -98,6 +98,7 @@ class AxesOverlay {
     this.viewer    = viewer;
     this.imgHeight = config.imgHeight;
     this.lw        = config.lw;
+    this.side      = config.side || null;
 
     // Deep-copy originals for reset
     this._origDots   = JSON.parse(JSON.stringify(config.dots));
@@ -119,11 +120,16 @@ class AxesOverlay {
     this._buildResetBtn();
     this._updateLines();
 
-    viewer.onTransformChange = () => {
+    this._transformHandler = () => {
       Object.values(this.dots).forEach(d => d.reposition());
       this.labels.forEach(l => l.reposition());
       this._updateLines();
     };
+    if (typeof viewer.addTransformListener === 'function') {
+      viewer.addTransformListener(this._transformHandler);
+    } else {
+      viewer.onTransformChange = this._transformHandler;
+    }
   }
 
   _buildSvg() {
@@ -183,7 +189,9 @@ class AxesOverlay {
   _buildResetBtn() {
     const btn = document.createElement('button');
     btn.className = 'axes-reset-btn';
-    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset Positions`;
+    if (this.side) btn.dataset.side = this.side;
+    const sideLabel = this.side === 'left' ? 'Left ' : this.side === 'right' ? 'Right ' : '';
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset ${sideLabel}Positions`;
     btn.style.display = 'none';
     btn.addEventListener('click', () => this.reset());
     btn.addEventListener('mousedown', e => e.stopPropagation());
@@ -263,7 +271,15 @@ class AxesOverlay {
     this.labels.forEach(l => l.remove());
     this.svg?.remove();
     this.resetBtn?.remove();
-    if (this.viewer) this.viewer.onTransformChange = null;
+    if (this.viewer) {
+      if (typeof this.viewer.removeTransformListener === 'function' && this._transformHandler) {
+        this.viewer.removeTransformListener(this._transformHandler);
+      }
+      if (this.viewer.onTransformChange === this._transformHandler) {
+        this.viewer.onTransformChange = null;
+      }
+    }
+    this._transformHandler = null;
   }
 
   // Returns dot positions as {key: {x,y}} for canvas drawing (download)

@@ -29,10 +29,12 @@ let visCanvas          = null;   // raw image canvas (no axes drawn — used as 
 let visLw              = 1;
 let visImgHeight       = 0;
 let currentViewer      = null;
-let currentAxesOverlay = null;
+let currentAxesOverlay = null;   // single-knee overlay (legacy, single-mode only)
+let currentAxesOverlays = [];    // dual-knee overlays (length 0 in single mode, 2 in dual)
 let cpakPanelOpen      = false;
 let kneeapPanelOpen    = false;
 let modelKinds         = {};     // { modelName: 'cpak' | 'kneeap' }
+let inferenceMode      = localStorage.getItem('cpak-mode') || 'dual';   // 'dual' | 'single'
 
 // ── DOM ────────────────────────────────────────────────────────────────────
 const appEl          = document.querySelector('.app');
@@ -69,8 +71,26 @@ const cpakMatrix     = document.getElementById('cpak-matrix');
 const kneeapPanel    = document.getElementById('kneeap-panel');
 const kneeapTab      = document.getElementById('kneeap-tab');
 const kneeapJlcaVal  = document.getElementById('kneeap-jlca-value');
+const modeToggle     = document.getElementById('mode-toggle');
 
 function currentKind() { return modelKinds[modelSelect.value] || 'cpak'; }
+
+// ── Mode toggle ─────────────────────────────────────────────────────────────
+function applyMode(mode) {
+  inferenceMode = mode === 'single' ? 'single' : 'dual';
+  for (const btn of modeToggle.querySelectorAll('.mode-opt')) {
+    const active = btn.dataset.mode === inferenceMode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  }
+  localStorage.setItem('cpak-mode', inferenceMode);
+}
+modeToggle.addEventListener('click', e => {
+  const btn = e.target.closest('.mode-opt');
+  if (!btn) return;
+  applyMode(btn.dataset.mode);
+});
+applyMode(inferenceMode);
 
 // ── Health check ───────────────────────────────────────────────────────────
 async function checkHealth() {
@@ -143,8 +163,7 @@ function doClear() {
   resultsSection.style.display = 'none';
   resultsGrid.classList.remove('visible');
   appEl.classList.remove('map-view');
-  currentAxesOverlay?.remove();
-  currentAxesOverlay = null;
+  destroyAxesOverlays();
   currentViewer      = null;
   visCanvas          = null;
   updateRunBtn();
@@ -168,10 +187,18 @@ async function runInference() {
   showImgLoading(visWrap);
 
   try {
-    if (kind === 'kneeap') {
-      await runKneeapInference(model);
+    if (inferenceMode === 'dual') {
+      if (kind === 'kneeap') {
+        await runDualKneeapInference(model);
+      } else {
+        await runDualCpakInference(model);
+      }
     } else {
-      await runCpakInference(model);
+      if (kind === 'kneeap') {
+        await runKneeapInference(model);
+      } else {
+        await runCpakInference(model);
+      }
     }
   } catch (err) {
     showToast('Inference failed: ' + err.message);
@@ -182,6 +209,7 @@ async function runInference() {
 }
 
 async function runCpakInference(model) {
+  setPanelMode('single');
   const jsonResp = await postImage(`${API}/infer/${model}`, selectedFile);
   if (!jsonResp.ok) throw new Error(await jsonResp.text());
 
@@ -205,10 +233,11 @@ async function runCpakInference(model) {
     resultsGrid.classList.add('visible');
     if (currentViewer) {
       currentViewer._fitToContainer();
-      currentAxesOverlay?.remove();
+      destroyAxesOverlays();
       currentAxesOverlay = new AxesOverlay(visWrap, currentViewer, {
         dots: dotPositions, labels: labelPositions, lw, imgHeight,
       });
+      currentAxesOverlays = [currentAxesOverlay];
 
       const initAngles = computeAngles(currentAxesOverlay.dots);
       if (initAngles) {
@@ -222,6 +251,7 @@ async function runCpakInference(model) {
 }
 
 async function runKneeapInference(model) {
+  setPanelMode('single');
   // Backend only supplies keypoints + JLCA; all drawing happens here.
   const jsonResp = await postImage(`${API}/infer/${model}`, selectedFile);
   if (!jsonResp.ok) throw new Error(await jsonResp.text());
@@ -245,22 +275,120 @@ async function runKneeapInference(model) {
     resultsGrid.classList.add('visible');
     if (currentViewer) {
       currentViewer._fitToContainer();
-      currentAxesOverlay?.remove();
+      destroyAxesOverlays();
       currentAxesOverlay = new KneeApOverlay(visWrap, currentViewer, {
         keypoints: data.keypoints,
         lw,
         imgHeight,
       });
+      currentAxesOverlays = [currentAxesOverlay];
     }
-    kneeapJlcaVal.textContent = data.metrics.jlca.toFixed(2) + '°';
+    updateKneeapPanel(data.metrics.jlca);
     openKneeapPanel();
   });
+}
+
+function updateKneeapPanel(jlca) {
+  kneeapJlcaVal.textContent = jlca.toFixed(2) + '°';
 }
 
 function postImage(url, file) {
   const fd = new FormData();
   fd.append('image', file);
   return fetch(url, { method: 'POST', body: fd });
+}
+
+// ── Dual inference (stubs — render wired in next steps) ────────────────────
+async function runDualCpakInference(model) {
+  setPanelMode('dual');
+  const resp = await postImage(`${API}/infer/${model}/dual`, selectedFile);
+  if (!resp.ok) throw new Error(await resp.text());
+  const data = await resp.json();
+
+  const { canvas, lw, imgHeight, sides } = await buildDualVisCanvas(
+    selectedFile, data.left.keypoints, data.left.metrics,
+    data.right.keypoints, data.right.metrics,
+  );
+  visCanvas    = canvas;
+  visLw        = lw;
+  visImgHeight = imgHeight;
+
+  appEl.classList.add('map-view');
+  topGrid.style.display = 'none';
+  navLoadBtn.classList.add('visible');
+  closeKneeapPanel();
+
+  const blob = await new Promise((res, rej) =>
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+  renderImage(blob, selectedFile.name);
+
+  requestAnimationFrame(() => {
+    resultsGrid.classList.add('visible');
+    if (currentViewer) {
+      currentViewer._fitToContainer();
+      destroyAxesOverlays();
+      for (const side of sides) {
+        const overlay = new AxesOverlay(visWrap, currentViewer, {
+          dots: side.dots, labels: side.labels, lw, imgHeight, side: side.key,
+        });
+        overlay.onAnglesChange = result => updateCpakDualPanel(side.key, result);
+        currentAxesOverlays.push(overlay);
+      }
+      // Initial CPAK results for both sides
+      for (const overlay of currentAxesOverlays) {
+        const a = computeAngles(overlay.dots);
+        if (a) updateCpakDualPanel(overlay.side, classifyCPAK(a.ldfa, a.mpta));
+      }
+      openCpakPanel();
+    }
+  });
+}
+
+async function runDualKneeapInference(model) {
+  setPanelMode('dual');
+  const resp = await postImage(`${API}/infer/${model}/dual`, selectedFile);
+  if (!resp.ok) throw new Error(await resp.text());
+  const data = await resp.json();
+
+  const { canvas, lw, imgHeight } = await buildKneeApVisCanvas(selectedFile);
+  visCanvas    = canvas;
+  visLw        = lw;
+  visImgHeight = imgHeight;
+
+  appEl.classList.add('map-view');
+  topGrid.style.display = 'none';
+  navLoadBtn.classList.add('visible');
+  closeCpakPanel();
+
+  const blob = await new Promise((res, rej) =>
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+  renderImage(blob, selectedFile.name);
+
+  requestAnimationFrame(() => {
+    resultsGrid.classList.add('visible');
+    if (currentViewer) {
+      currentViewer._fitToContainer();
+      destroyAxesOverlays();
+      for (const sideKey of ['left', 'right']) {
+        const overlay = new KneeApOverlay(visWrap, currentViewer, {
+          keypoints: data[sideKey].keypoints,
+          lw,
+          imgHeight,
+        });
+        overlay.side = sideKey;
+        currentAxesOverlays.push(overlay);
+      }
+    }
+    updateKneeapDualPanel(data.left.metrics.jlca, data.right.metrics.jlca);
+    openKneeapPanel();
+  });
+}
+
+function destroyAxesOverlays() {
+  currentAxesOverlay?.remove();
+  currentAxesOverlay = null;
+  for (const o of currentAxesOverlays) o.remove();
+  currentAxesOverlays = [];
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -277,11 +405,13 @@ function downloadWithLabels(stem) {
   dc.height = visCanvas.height;
   const ctx = dc.getContext('2d');
   ctx.drawImage(visCanvas, 0, 0);
-  if (currentAxesOverlay instanceof KneeApOverlay) {
-    drawKneeApAnnotationsOnContext(ctx, currentAxesOverlay.getKeypoints(), visLw);
-  } else if (currentAxesOverlay) {
-    drawAxesOnContext(ctx, currentAxesOverlay.getDotPositions(), visLw, visImgHeight);
-    drawLabelsOnCanvas(ctx, currentAxesOverlay.getLabelPositions(), visLw);
+  for (const overlay of currentAxesOverlays) {
+    if (overlay instanceof KneeApOverlay) {
+      drawKneeApAnnotationsOnContext(ctx, overlay.getKeypoints(), visLw);
+    } else if (overlay) {
+      drawAxesOnContext(ctx, overlay.getDotPositions(), visLw, visImgHeight);
+      drawLabelsOnCanvas(ctx, overlay.getLabelPositions(), visLw);
+    }
   }
   dc.toBlob(blob => downloadBlob(blob, `${stem}_axes.png`), 'image/png');
 }
@@ -361,6 +491,40 @@ function updateCpakPanel(result) {
   setCpakCatClass(cpakAhkaCat, result.ahkaCat);
   setCpakCatClass(cpakJloCat,  result.jloCat);
   buildCpakMatrix(result.cpakType);
+}
+
+function setPanelMode(mode) {
+  // Toggles the .dual class on both cpak and kneeap panels so the right
+  // single/dual section is visible.
+  const dual = mode === 'dual';
+  cpakPanel.classList.toggle('dual', dual);
+  kneeapPanel.classList.toggle('dual', dual);
+}
+
+function updateCpakDualPanel(side, result) {
+  const prefix = side === 'left' ? 'l' : 'r';
+  document.getElementById(`cpak-${prefix}-type`).textContent     = result.cpakType;
+  document.getElementById(`cpak-${prefix}-ldfa`).textContent     = result.ldfa.toFixed(1) + '°';
+  document.getElementById(`cpak-${prefix}-mpta`).textContent     = result.mpta.toFixed(1) + '°';
+  document.getElementById(`cpak-${prefix}-ahka`).textContent     =
+    (result.ahka >= 0 ? '+' : '') + result.ahka.toFixed(1) + '°';
+  document.getElementById(`cpak-${prefix}-jlo`).textContent      = result.jlo.toFixed(1) + '°';
+  const ahkaCat = document.getElementById(`cpak-${prefix}-ahka-cat`);
+  const jloCat  = document.getElementById(`cpak-${prefix}-jlo-cat`);
+  ahkaCat.textContent = result.ahkaCat;
+  jloCat.textContent  = result.jloCat;
+  setCpakCatClass(ahkaCat, result.ahkaCat);
+  setCpakCatClass(jloCat,  result.jloCat);
+
+  // Highlight the side that just updated
+  for (const block of cpakPanel.querySelectorAll('.cpak-side-block')) {
+    block.classList.toggle('active', block.dataset.side === side);
+  }
+}
+
+function updateKneeapDualPanel(leftJlca, rightJlca) {
+  document.getElementById('kneeap-l-jlca').textContent = leftJlca.toFixed(2) + '°';
+  document.getElementById('kneeap-r-jlca').textContent = rightJlca.toFixed(2) + '°';
 }
 
 function openCpakPanel() {

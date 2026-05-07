@@ -165,6 +165,42 @@ function drawLabelsOnCanvas(ctx, labelData, lw) {
   }
 }
 
+// Dual-knee variant: builds the same raw-image canvas, plus two sides
+// ({left, right}) each with their own dot/label positions. Both sides share
+// the SAME image space, so coordinates are not transformed.
+async function buildDualVisCanvas(file, leftKps, leftMetrics, rightKps, rightMetrics) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+
+      const lw = Math.max(1, Math.round(img.naturalWidth / 400));
+
+      const buildSide = (key, kps, metrics) => {
+        const axes = computeAxes(kps);
+        const dots = {};
+        for (const [k, v] of Object.entries(axes)) dots[k] = { ix: v.x, iy: v.y };
+        const labels = getDefaultLabelPositions(axes, metrics, lw, img.naturalHeight);
+        return { key, dots, labels };
+      };
+
+      const sides = [
+        buildSide('left',  leftKps,  leftMetrics),
+        buildSide('right', rightKps, rightMetrics),
+      ];
+
+      URL.revokeObjectURL(url);
+      resolve({ canvas, sides, lw, imgHeight: img.naturalHeight });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image for canvas drawing')); };
+    img.src = url;
+  });
+}
+
 // Build image-only canvas + all initial overlay positions.
 // Returns { canvas (raw image, no axes drawn), dotPositions, labelPositions, lw, imgHeight }
 async function buildVisCanvas(file, keypoints, metrics) {

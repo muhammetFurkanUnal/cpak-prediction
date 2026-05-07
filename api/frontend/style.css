@@ -103,6 +103,25 @@ select {
 }
 select:focus { outline: none; border-color: var(--accent); }
 
+/* Segmented mode toggle */
+.mode-toggle {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px;
+}
+.mode-opt {
+  appearance: none; border: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  padding: 7px 8px; border-radius: 6px;
+  background: transparent; color: var(--muted);
+  transition: background .18s, color .18s;
+}
+.mode-opt:hover { color: var(--text); }
+.mode-opt.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
 .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; font-family: 'Inter', sans-serif; transition: all .2s; }
 .btn-primary { background: var(--accent); color: #000; }
 .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, white); transform: translateY(-1px); box-shadow: 0 4px 20px color-mix(in srgb, var(--accent) 40%, transparent); }
@@ -300,6 +319,9 @@ select:focus { outline: none; border-color: var(--accent); }
   background: color-mix(in srgb, var(--warn) 12%, rgba(7,13,26,0.88));
   box-shadow: 0 0 0 1px var(--warn);
 }
+/* Stack the per-side reset buttons in dual mode so they don't overlap */
+.axes-reset-btn[data-side="left"]  { bottom: 100px; }
+.axes-reset-btn[data-side="right"] { bottom: 56px; }
 
 /* ── Draggable angle labels ───────────────────────────────── */
 .angle-label {
@@ -612,3 +634,31 @@ tbody td { padding: 8px 14px; font-family: 'JetBrains Mono', monospace; }
 }
 
 .divider { height: 1px; background: var(--border); margin: 28px 0; }
+
+/* ── Single vs Dual section visibility (driven by .cpak-panel.dual class) ── */
+.cpak-section-dual { display: none; }
+.cpak-panel.dual .cpak-section-single { display: none; }
+.cpak-panel.dual .cpak-section-dual   { display: block; }
+
+/* Dual L/R side blocks inside CPAK panel */
+.cpak-side-block {
+  border-bottom: 1px solid var(--border);
+  padding: 4px 0 8px;
+}
+.cpak-side-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px 6px;
+}
+.cpak-side-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted);
+}
+.cpak-side-type {
+  font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700;
+  color: var(--accent2); line-height: 1;
+}
+.cpak-side-block.active .cpak-side-label { color: var(--accent2); }
+.cpak-side-block.active {
+  background: color-mix(in srgb, var(--accent2) 6%, transparent);
+}
+.cpak-angles-dual { padding: 6px 18px 10px; }

@@ -213,7 +213,12 @@ class KneeApOverlay {
     this._svgEls   = [];   // {el, a:{x,y}, b:{x,y}, w}
     this._dotEls   = [];   // {el, x, y, color}
     this._build();
-    viewer.onTransformChange = () => this._reposition();
+    this._transformHandler = () => this._reposition();
+    if (typeof viewer.addTransformListener === 'function') {
+      viewer.addTransformListener(this._transformHandler);
+    } else {
+      viewer.onTransformChange = this._transformHandler;
+    }
   }
 
   _build() {
@@ -289,7 +294,15 @@ class KneeApOverlay {
     this._svgEls = [];
     this._dotEls = [];
     this._svg = null;
-    if (this.viewer) this.viewer.onTransformChange = null;
+    if (this.viewer) {
+      if (typeof this.viewer.removeTransformListener === 'function' && this._transformHandler) {
+        this.viewer.removeTransformListener(this._transformHandler);
+      }
+      if (this.viewer.onTransformChange === this._transformHandler) {
+        this.viewer.onTransformChange = null;
+      }
+    }
+    this._transformHandler = null;
   }
 
   getKeypoints() { return this.kps; }

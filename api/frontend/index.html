@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=4" />
+  <link rel="stylesheet" href="/static/style.css?v=5" />
 </head>
 <body>
 <div class="app">
@@ -61,6 +61,13 @@
           <label class="field-label" for="model-select">Model</label>
           <select id="model-select"><option value="">Loading models…</option></select>
         </div>
+        <div>
+          <label class="field-label">Mode</label>
+          <div class="mode-toggle" id="mode-toggle" role="tablist">
+            <button type="button" class="mode-opt active" data-mode="dual"   role="tab" aria-selected="true">Dual Knee</button>
+            <button type="button" class="mode-opt"        data-mode="single" role="tab" aria-selected="false">Single Knee</button>
+          </div>
+        </div>
         <div style="flex:1"></div>
         <button class="btn btn-primary" id="run-btn" disabled>
           <div class="spinner" id="btn-spinner"></div>
@@ -108,11 +115,34 @@
               <div class="cpak-panel-header">
                 <span class="cpak-panel-title">Knee AP Analysis</span>
               </div>
-              <div class="cpak-type-hero">
-                <div class="cpak-type-label">JLCA</div>
-                <div class="cpak-type-value" id="kneeap-jlca-value">—</div>
+
+              <!-- Single mode -->
+              <div class="cpak-section cpak-section-single">
+                <div class="cpak-type-hero">
+                  <div class="cpak-type-label">JLCA</div>
+                  <div class="cpak-type-value" id="kneeap-jlca-value">—</div>
+                </div>
+                <div class="cpak-hint" style="padding:14px 18px;">Joint line convergence angle</div>
               </div>
-              <div class="cpak-hint" style="padding:14px 18px;">Joint line convergence angle</div>
+
+              <!-- Dual mode -->
+              <div class="cpak-section cpak-section-dual">
+                <div class="cpak-side-block">
+                  <div class="cpak-side-header"><span class="cpak-side-label">Left Knee</span></div>
+                  <div class="cpak-type-hero" style="padding:12px 18px;">
+                    <div class="cpak-type-label">JLCA</div>
+                    <div class="cpak-type-value" id="kneeap-l-jlca" style="font-size:32px;">—</div>
+                  </div>
+                </div>
+                <div class="cpak-side-block">
+                  <div class="cpak-side-header"><span class="cpak-side-label">Right Knee</span></div>
+                  <div class="cpak-type-hero" style="padding:12px 18px;">
+                    <div class="cpak-type-label">JLCA</div>
+                    <div class="cpak-type-value" id="kneeap-r-jlca" style="font-size:32px;">—</div>
+                  </div>
+                </div>
+                <div class="cpak-hint" style="padding:14px 18px;">Joint line convergence angle</div>
+              </div>
             </div>
           </div>
 
@@ -131,37 +161,63 @@
                 <span class="cpak-panel-title">CPAK Classification</span>
               </div>
 
-              <div class="cpak-type-hero">
-                <div class="cpak-type-label">Type</div>
-                <div class="cpak-type-value" id="cpak-type-value">—</div>
+              <!-- Single-knee section (shown in single mode) -->
+              <div class="cpak-section cpak-section-single">
+                <div class="cpak-type-hero">
+                  <div class="cpak-type-label">Type</div>
+                  <div class="cpak-type-value" id="cpak-type-value">—</div>
+                </div>
+
+                <div class="cpak-angles">
+                  <div class="cpak-angle-row">
+                    <span class="cpak-angle-key ldfa-color">LDFA</span>
+                    <span class="cpak-angle-val" id="cpak-ldfa">—</span>
+                  </div>
+                  <div class="cpak-angle-row">
+                    <span class="cpak-angle-key mpta-color">MPTA</span>
+                    <span class="cpak-angle-val" id="cpak-mpta">—</span>
+                  </div>
+                  <div class="cpak-divider"></div>
+                  <div class="cpak-angle-row">
+                    <span class="cpak-angle-key">aHKA</span>
+                    <span class="cpak-angle-val" id="cpak-ahka">—</span>
+                    <span class="cpak-cat" id="cpak-ahka-cat"></span>
+                  </div>
+                  <div class="cpak-angle-row">
+                    <span class="cpak-angle-key">JLO</span>
+                    <span class="cpak-angle-val" id="cpak-jlo">—</span>
+                    <span class="cpak-cat" id="cpak-jlo-cat"></span>
+                  </div>
+                </div>
+
+                <div class="cpak-matrix-label">Phenotype Matrix</div>
+                <div class="cpak-matrix" id="cpak-matrix"><!-- filled by JS --></div>
+                <div class="cpak-matrix-legend"><span>rows: aHKA (Varus / Neutral / Valgus)</span></div>
+                <div class="cpak-matrix-legend" style="padding-top:0"><span>cols: JLO (Proximal / Neutral / Distal)</span></div>
               </div>
 
-              <div class="cpak-angles">
-                <div class="cpak-angle-row">
-                  <span class="cpak-angle-key ldfa-color">LDFA</span>
-                  <span class="cpak-angle-val" id="cpak-ldfa">—</span>
+              <!-- Dual-knee section (shown in dual mode): two stacked side blocks -->
+              <div class="cpak-section cpak-section-dual">
+                <div class="cpak-side-block" data-side="left">
+                  <div class="cpak-side-header"><span class="cpak-side-label">Left Knee</span><span class="cpak-side-type" id="cpak-l-type">—</span></div>
+                  <div class="cpak-angles cpak-angles-dual">
+                    <div class="cpak-angle-row"><span class="cpak-angle-key ldfa-color">LDFA</span><span class="cpak-angle-val" id="cpak-l-ldfa">—</span></div>
+                    <div class="cpak-angle-row"><span class="cpak-angle-key mpta-color">MPTA</span><span class="cpak-angle-val" id="cpak-l-mpta">—</span></div>
+                    <div class="cpak-angle-row"><span class="cpak-angle-key">aHKA</span><span class="cpak-angle-val" id="cpak-l-ahka">—</span><span class="cpak-cat" id="cpak-l-ahka-cat"></span></div>
+                    <div class="cpak-angle-row"><span class="cpak-angle-key">JLO</span><span class="cpak-angle-val" id="cpak-l-jlo">—</span><span class="cpak-cat" id="cpak-l-jlo-cat"></span></div>
+                  </div>
                 </div>
-                <div class="cpak-angle-row">
-                  <span class="cpak-angle-key mpta-color">MPTA</span>
-                  <span class="cpak-angle-val" id="cpak-mpta">—</span>
-                </div>
-                <div class="cpak-divider"></div>
-                <div class="cpak-angle-row">
-                  <span class="cpak-angle-key">aHKA</span>
-                  <span class="cpak-angle-val" id="cpak-ahka">—</span>
-                  <span class="cpak-cat" id="cpak-ahka-cat"></span>
-                </div>
-                <div class="cpak-angle-row">
-                  <span class="cpak-angle-key">JLO</span>
-                  <span class="cpak-angle-val" id="cpak-jlo">—</span>
-                  <span class="cpak-cat" id="cpak-jlo-cat"></span>
+
+                <div class="cpak-side-block" data-side="right">
+                  <div class="cpak-side-header"><span class="cpak-side-label">Right Knee</span><span class="cpak-side-type" id="cpak-r-type">—</span></div>
+                  <div class="cpak-angles cpak-angles-dual">
+                    <div class="cpak-angle-row"><span class="cpak-angle-key ldfa-color">LDFA</span><span class="cpak-angle-val" id="cpak-r-ldfa">—</span></div>
+                    <div class="cpak-angle-row"><span class="cpak-angle-key mpta-color">MPTA</span><span class="cpak-angle-val" id="cpak-r-mpta">—</span></div>
+                    <div class="cpak-angle-row"><span class="cpak-angle-key">aHKA</span><span class="cpak-angle-val" id="cpak-r-ahka">—</span><span class="cpak-cat" id="cpak-r-ahka-cat"></span></div>
+                    <div class="cpak-angle-row"><span class="cpak-angle-key">JLO</span><span class="cpak-angle-val" id="cpak-r-jlo">—</span><span class="cpak-cat" id="cpak-r-jlo-cat"></span></div>
+                  </div>
                 </div>
               </div>
-
-              <div class="cpak-matrix-label">Phenotype Matrix</div>
-              <div class="cpak-matrix" id="cpak-matrix"><!-- filled by JS --></div>
-              <div class="cpak-matrix-legend"><span>rows: aHKA (Varus / Neutral / Valgus)</span></div>
-              <div class="cpak-matrix-legend" style="padding-top:0"><span>cols: JLO (Proximal / Neutral / Distal)</span></div>
 
               <div class="cpak-hint">Drag dots to recalculate</div>
             </div>
@@ -184,11 +240,11 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="/static/viewer.js?v=4"></script>
-<script src="/static/cpak.js?v=4"></script>
-<script src="/static/canvas.js?v=4"></script>
-<script src="/static/overlay.js?v=4"></script>
-<script src="/static/kneeap_overlay.js?v=4"></script>
-<script src="/static/app.js?v=4"></script>
+<script src="/static/viewer.js?v=5"></script>
+<script src="/static/cpak.js?v=5"></script>
+<script src="/static/canvas.js?v=5"></script>
+<script src="/static/overlay.js?v=5"></script>
+<script src="/static/kneeap_overlay.js?v=5"></script>
+<script src="/static/app.js?v=5"></script>
 </body>
 </html>
