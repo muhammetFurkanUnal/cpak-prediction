@@ -37,7 +37,7 @@ function classifyCPAK(ldfa, mpta) {
   const jlo  = mpta + ldfa;
 
   const ahkaCat = ahka < -2 ? 'Varus' : ahka > 2 ? 'Valgus' : 'Neutral';
-  const jloCat  = jlo > 177 ? 'Apex Proximal' : jlo < 173 ? 'Apex Distal' : 'Neutral';
+  const jloCat  = jlo > 183 ? 'Apex Proximal' : jlo < 177 ? 'Apex Distal' : 'Neutral';
 
   const typeMap = {
     'Varus:Apex Proximal':   'I',

@@ -21,7 +21,7 @@ video_sets:
 
     
 bodyparts:
-- '1'
+- 'notch'
 - '2'
 - '3'
 - '4'
@@ -36,7 +36,7 @@ bodyparts:
 - '13'
 - '14'
 - '15'
-- '16'
+- 'inter'
 - '17'
 - '18'
 - '19'
@@ -51,6 +51,13 @@ bodyparts:
 - '28'
 - '29'
 - '30'
+# femur
+- 'fem_lat'
+- 'fem_med'
+# tibia
+- 'tib_lat'
+- 'tib_med'
+
 
 
 # Fraction of video to start/stop when extracting frames for labeling/refinement
@@ -62,10 +69,18 @@ numframes2pick: 20
 # Plotting configuration
 skeleton:
 # femur notch
-- - '1'
-  - '2'
-- - '1'
-  - '9'
+
+- - '2'
+  - 'fem_lat'
+- - 'fem_lat'
+  - 'notch'
+
+- - '9'
+  - 'fem_med'
+- - 'fem_med'
+  - 'notch'
+
+
 # femur lateral
 - - '2'
   - '6'
@@ -93,10 +108,17 @@ skeleton:
 - - '15'
   - '10'
 # tibia intercondylar
-- - '16'
-  - '17'
-- - '16'
-  - '24'
+
+- - '17'
+  - 'tib_lat'
+- - 'tib_lat'
+  - 'inter'
+- - '24'
+  - 'tib_med'
+- - 'tib_med'
+  - 'inter'
+
+
 # tibia lateral
 - - '17'
   - '21'
