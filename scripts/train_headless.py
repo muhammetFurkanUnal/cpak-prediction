@@ -25,7 +25,7 @@ PROJECT_DIR = REPO_ROOT / "kneeap-furkan-2026-04-29"
 LABELED_DIR = PROJECT_DIR / "labeled-data" / "video"
 IMAGES_SRC  = REPO_ROOT / "preprocessing" / "knee-preop-prepped"
 ASSETS      = REPO_ROOT / "assets" / "kneeap"
-CSV_SRC     = ASSETS / "CollectedData_furkan.csv"
+H5_SRC      = ASSETS / "CollectedData_furkan.h5"
 CONFIG_SRC  = ASSETS / "config.yaml"
 CONFIG_DST  = PROJECT_DIR / "config.yaml"
 
@@ -56,7 +56,7 @@ def setup_project():
         sys.exit(1)
 
     import pandas as pd
-    df = pd.read_csv(CSV_SRC, header=[0, 1, 2], index_col=[0, 1, 2])
+    df = pd.read_hdf(H5_SRC)
     labeled_frames = [idx[2] for idx in df.index]
 
     copied = 0
@@ -77,13 +77,13 @@ def setup_project():
     if missing:
         print("   Missing:", missing[:5], "..." if len(missing) > 5 else "")
 
-    print(f"[4/4] Writing CSV and H5 → {LABELED_DIR}")
-    csv_dst = LABELED_DIR / "CollectedData_furkan.csv"
-    shutil.copy2(CSV_SRC, csv_dst)
-
+    print(f"[4/4] Writing H5 and CSV → {LABELED_DIR}")
     h5_dst = LABELED_DIR / "CollectedData_furkan.h5"
-    df.to_hdf(h5_dst, key="df_with_missing", mode="w")
-    print(f"   H5 written: {h5_dst}")
+    shutil.copy2(H5_SRC, h5_dst)
+
+    csv_dst = LABELED_DIR / "CollectedData_furkan.csv"
+    df.to_csv(csv_dst)
+    print(f"   H5 + CSV written: {h5_dst}")
 
     print(f"\nSetup complete. Config: {CONFIG_DST}")
     return str(CONFIG_DST)
