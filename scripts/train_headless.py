@@ -103,7 +103,7 @@ def train(config_path: str, shuffle: int = 1, epochs: int = 1000, max_snapshots:
         sys.exit(1)
 
     import deeplabcut
-    print(f"\n── train_network ({epochs} epochs) ──────────────────────────────────")
+    print(f"\n── train_network (shuffle {shuffle}, {epochs} epochs) ──────────────────")
     # NOTE: PyTorch backend ignores maxiters; epochs= is the authoritative kwarg
     # and it overwrites pytorch_config.yaml on disk via update_model_cfg.
     deeplabcut.train_network(
