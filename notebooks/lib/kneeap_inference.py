@@ -11,23 +11,20 @@ import onnxruntime as ort
 Point = Tuple[float, float]
 
 
-# ── Bodypart indices (0-based; in config they are labeled '1'..'30' = 1-based) ──
+# ── Bodypart indices (0-based; matches kneeap-furkan-2026-04-29/config.yaml) ──
 # Femur
-NOTCH            = 0    # '1'  intercondylar notch
-F_LAT_JOINT      = 1    # '2'  femur lateral condyle (joint side)
-F_LAT_EDGE       = 2    # '3'  femur lateral condyle (outer edge)
-F_LAT_CHAIN      = [1, 5, 3, 6, 4, 7, 2]    # 2 → 6 → 4 → 7 → 5 → 8 → 3
-F_MED_JOINT      = 8    # '9'  femur medial condyle (joint side)
-F_MED_EDGE       = 9    # '10' femur medial condyle (outer edge)
-F_MED_CHAIN      = [8, 12, 10, 13, 11, 14, 9]   # 9 → 13 → 11 → 14 → 12 → 15 → 10
+NOTCH            = 0    # 'notch'  intercondylar notch
+F_LAT_CHAIN      = [1, 5, 3, 6, 4, 7, 2]    # '2' → '6' → '4' → '7' → '5' → '8' → '3'
+F_MED_CHAIN      = [8, 12, 10, 13, 11, 14, 9]   # '9' → '13' → '11' → '14' → '12' → '15' → '10'
 # Tibia
-T_INTER_LAT      = 15   # '16' tibial intercondylar (lateral spike side)
-T_LAT_JOINT      = 16   # '17' tibial lateral plateau (joint side)
-T_LAT_EDGE       = 17   # '18' tibial lateral plateau (outer edge)
-T_LAT_CHAIN      = [16, 20, 18, 21, 19, 22, 17]  # 17 → 21 → 19 → 22 → 20 → 23 → 18
-T_INTER_MED      = 23   # '24' tibial intercondylar (medial spike side)
-T_MED_EDGE       = 24   # '25' tibial medial plateau (outer edge)
-T_MED_CHAIN      = [23, 27, 25, 28, 26, 29, 24]  # 24 → 28 → 26 → 29 → 27 → 30 → 25
+INTER            = 15   # 'inter'  tibial intercondylar (single landmark)
+T_LAT_CHAIN      = [16, 20, 18, 21, 19, 22, 17]  # '17' → '21' → '19' → '22' → '20' → '23' → '18'
+T_MED_CHAIN      = [23, 27, 25, 28, 26, 29, 24]  # '24' → '28' → '26' → '29' → '27' → '30' → '25'
+# Joint-surface landmarks (added in 2026-04-29 model)
+FEM_LAT          = 30   # 'fem_lat'  femur lateral joint position
+FEM_MED          = 31   # 'fem_med'  femur medial joint position
+TIB_LAT          = 32   # 'tib_lat'  tibia lateral joint position
+TIB_MED          = 33   # 'tib_med'  tibia medial joint position
 
 
 class KneeMetrics(TypedDict):
@@ -70,19 +67,16 @@ def calculate_vector_angle(v1: Point, v2: Point) -> float:
 
 def compute_kneeap_metrics(coords: List[Point]) -> KneeMetrics:
     femur_notch         = tuple(coords[NOTCH])
-    femur_lateral_joint = tuple(coords[F_LAT_JOINT])
-    femur_medial_joint  = tuple(coords[F_MED_JOINT])
+    femur_lateral_joint = tuple(coords[FEM_LAT])
+    femur_medial_joint  = tuple(coords[FEM_MED])
     femur_joint_mid     = (
         (femur_lateral_joint[0] + femur_medial_joint[0]) / 2.0,
         (femur_lateral_joint[1] + femur_medial_joint[1]) / 2.0,
     )
 
-    tibia_intercondylar_mid = (
-        (coords[T_INTER_LAT][0] + coords[T_INTER_MED][0]) / 2.0,
-        (coords[T_INTER_LAT][1] + coords[T_INTER_MED][1]) / 2.0,
-    )
-    tibia_lateral_joint = tuple(coords[T_LAT_JOINT])
-    tibia_medial_joint  = tuple(coords[T_INTER_MED])  # '24' is the medial joint side
+    tibia_intercondylar_mid = tuple(coords[INTER])
+    tibia_lateral_joint = tuple(coords[TIB_LAT])
+    tibia_medial_joint  = tuple(coords[TIB_MED])
     tibia_joint_mid     = (
         (tibia_lateral_joint[0] + tibia_medial_joint[0]) / 2.0,
         (tibia_lateral_joint[1] + tibia_medial_joint[1]) / 2.0,
@@ -154,10 +148,11 @@ def draw_lines(image, metrics: KneeMetrics, coords: List[Point]):
         for idx in chain:
             dot(coords[idx], color)
 
-    # notch + intercondylar dots
+    # notch + intercondylar + joint markers
     dot(metrics["femur_notch"], (255, 0, 0))
-    dot(coords[T_INTER_LAT], (0, 0, 255))
-    dot(coords[T_INTER_MED], (0, 0, 255))
+    dot(coords[INTER], (0, 0, 255))
+    for idx in (FEM_LAT, FEM_MED, TIB_LAT, TIB_MED):
+        dot(coords[idx], (0, 255, 0), r=2)
 
     # joint lines
     line(metrics["femur_lateral_joint"], metrics["femur_medial_joint"], (0, 255, 0), 2)
