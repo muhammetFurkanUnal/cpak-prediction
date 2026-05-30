@@ -158,7 +158,7 @@ colormap: rainbow
 
 # Training,Evaluation and Analysis configuration
 TrainingFraction:
-- 0.95
+- 1
 iteration: 0
 default_net_type: resnet_50
 default_augmenter: default
