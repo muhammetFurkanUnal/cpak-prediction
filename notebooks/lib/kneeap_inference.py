@@ -26,6 +26,12 @@ FEM_MED          = 31   # 'fem_med'  femur medial joint position
 TIB_LAT          = 32   # 'tib_lat'  tibia lateral joint position
 TIB_MED          = 33   # 'tib_med'  tibia medial joint position
 
+# Number of chain midpoints used to fit each anatomical (shaft) axis.
+# The extreme chain endpoint (last lat/med pair) is dropped before fitting — the
+# landmark deviates strongly there — so the axis is fit through the next 3
+# midpoints closest to that (now-removed) far end.
+AXIS_FIT_POINTS = 3
+
 
 class KneeMetrics(TypedDict):
     # femur landmarks
@@ -38,8 +44,18 @@ class KneeMetrics(TypedDict):
     tibia_lateral_joint: Point
     tibia_medial_joint: Point
     tibia_joint_mid: Point
-    # angles
-    jlca: float            # joint line convergence angle
+    # anatomical (shaft) axes: unit direction + a point on the fitted line
+    femur_axis_dir: Point
+    femur_axis_pt: Point
+    tibia_axis_dir: Point
+    tibia_axis_pt: Point
+    # angles — measured from the ANATOMICAL (shaft) axis, since the mechanical axis
+    # (femoral-head / ankle centres) is not visible in a knee close-up. Hence the
+    # 'a' prefix: aLDFA/aMPTA, not the mechanical mLDFA/mMPTA.
+    aldfa: float               # anatomic LDFA: femur anatomical axis ∠ femur joint line
+    ampta: float               # anatomic MPTA: tibia anatomical axis ∠ tibia joint line
+    femorotibial_angle: float  # anatomic FTA: femur anatomical axis ∠ tibia anatomical axis
+    jlca: float                # joint line convergence angle (femur joint ∠ tibia joint)
 
 
 # ── Geometry helpers ──────────────────────────────────────────────────────────
@@ -61,6 +77,44 @@ def calculate_vector_angle(v1: Point, v2: Point) -> float:
     val = max(-1.0, min(1.0, dot / (m1 * m2)))
     angle = math.degrees(math.acos(val))
     return angle if angle <= 90.0 else 180.0 - angle
+
+
+# ── Anatomical-axis helpers ─────────────────────────────────────────────────────
+
+def _chain_midpoints(lat_chain, med_chain, coords):
+    """Pair-wise midpoints between lateral and medial chain points."""
+    return [
+        ((coords[li][0] + coords[mi][0]) / 2.0,
+         (coords[li][1] + coords[mi][1]) / 2.0)
+        for li, mi in zip(lat_chain, med_chain)
+    ]
+
+
+def _fit_anatomical_axis(midpoints):
+    """Least-squares line through midpoints. Returns unit-direction (vx, vy) and a point (x0, y0)."""
+    pts = np.array(midpoints, dtype=np.float32)
+    vx, vy, x0, y0 = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01).flatten()
+    return float(vx), float(vy), float(x0), float(y0)
+
+
+def _anatomical_axis(coords, lat_chain, med_chain, take_top):
+    """
+    Fit the anatomical (shaft) axis for a femur/tibia chain.
+
+    The extreme chain endpoint (last lat/med pair — femur '2'/'9', tibia '17'/'24')
+    is dropped, then the axis is fit through the AXIS_FIT_POINTS midpoints farthest
+    from the joint (top of the image for the femur, bottom for the tibia).
+
+    Returns (direction, point_on_line, fit_points):
+      direction      (vx, vy) unit vector along the shaft
+      point_on_line  (x0, y0) a point the fitted line passes through
+      fit_points     the midpoints actually used (for drawing)
+    """
+    midpoints = _chain_midpoints(lat_chain[:-1], med_chain[:-1], coords)
+    midpoints.sort(key=lambda p: p[1])  # ascending y (image top first)
+    fit_points = midpoints[:AXIS_FIT_POINTS] if take_top else midpoints[-AXIS_FIT_POINTS:]
+    vx, vy, x0, y0 = _fit_anatomical_axis(fit_points)
+    return (vx, vy), (x0, y0), fit_points
 
 
 # ── Orthopedic metrics (knee AP) ──────────────────────────────────────────────
@@ -90,6 +144,17 @@ def compute_kneeap_metrics(coords: List[Point]) -> KneeMetrics:
         tibia_medial_joint[0] - tibia_lateral_joint[0],
         tibia_medial_joint[1] - tibia_lateral_joint[1],
     )
+
+    # anatomical (shaft) axes — fit through 3 midpoints, extreme endpoint dropped
+    femur_axis_dir, femur_axis_pt, _ = _anatomical_axis(
+        coords, F_LAT_CHAIN, F_MED_CHAIN, take_top=True)
+    tibia_axis_dir, tibia_axis_pt, _ = _anatomical_axis(
+        coords, T_LAT_CHAIN, T_MED_CHAIN, take_top=False)
+
+    # angles (anatomical-axis based — see KneeMetrics for naming rationale)
+    aldfa = calculate_vector_angle(femur_axis_dir, femur_joint_vec)
+    ampta = calculate_vector_angle(tibia_axis_dir, tibia_joint_vec)
+    femorotibial_angle = calculate_vector_angle(femur_axis_dir, tibia_axis_dir)
     jlca = calculate_vector_angle(femur_joint_vec, tibia_joint_vec)
 
     return {
@@ -101,6 +166,13 @@ def compute_kneeap_metrics(coords: List[Point]) -> KneeMetrics:
         "tibia_lateral_joint": tibia_lateral_joint,
         "tibia_medial_joint": tibia_medial_joint,
         "tibia_joint_mid": tibia_joint_mid,
+        "femur_axis_dir": femur_axis_dir,
+        "femur_axis_pt": femur_axis_pt,
+        "tibia_axis_dir": tibia_axis_dir,
+        "tibia_axis_pt": tibia_axis_pt,
+        "aldfa": aldfa,
+        "ampta": ampta,
+        "femorotibial_angle": femorotibial_angle,
         "jlca": jlca,
     }
 
@@ -114,21 +186,20 @@ CHAIN_GROUPS = [
     ("tibia_medial",   T_MED_CHAIN, (0, 100, 255)),
 ]
 
-
-def _chain_midpoints(lat_chain, med_chain, coords):
-    """Pair-wise midpoints between lateral and medial chain points."""
-    return [
-        ((coords[li][0] + coords[mi][0]) / 2.0,
-         (coords[li][1] + coords[mi][1]) / 2.0)
-        for li, mi in zip(lat_chain, med_chain)
-    ]
+_LABEL_SCALE = 0.5
+_LABEL_THICK = 1
 
 
-def _fit_anatomical_axis(midpoints):
-    """Least-squares line through midpoints. Returns unit-direction (vx, vy) and a point (x0, y0)."""
-    pts = np.array(midpoints, dtype=np.float32)
-    vx, vy, x0, y0 = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01).flatten()
-    return float(vx), float(vy), float(x0), float(y0)
+def _draw_label(vis, text, org, color):
+    """Draw readable text: clamp fully inside the image and add a black outline."""
+    h, w = vis.shape[:2]
+    (tw, th), base = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, _LABEL_SCALE, _LABEL_THICK)
+    x = max(2, min(int(org[0]), w - tw - 2))
+    y = max(th + 2, min(int(org[1]), h - base - 2))
+    cv2.putText(vis, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, _LABEL_SCALE, (0, 0, 0),
+                _LABEL_THICK + 2, cv2.LINE_AA)
+    cv2.putText(vis, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, _LABEL_SCALE, color,
+                _LABEL_THICK, cv2.LINE_AA)
 
 
 def draw_lines(image, metrics: KneeMetrics, coords: List[Point]):
@@ -138,8 +209,6 @@ def draw_lines(image, metrics: KneeMetrics, coords: List[Point]):
     def pt(p): return (int(round(p[0])), int(round(p[1])))
     def dot(p, color, r=radius): cv2.circle(vis, pt(p), r, color, -1)
     def line(a, b, color, thick=1): cv2.line(vis, pt(a), pt(b), color, thick)
-    def text(s, p, color):
-        cv2.putText(vis, s, pt(p), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
 
     # condyle outline chains
     for _name, chain, color in CHAIN_GROUPS:
@@ -158,35 +227,38 @@ def draw_lines(image, metrics: KneeMetrics, coords: List[Point]):
     line(metrics["femur_lateral_joint"], metrics["femur_medial_joint"], (0, 255, 0), 2)
     line(metrics["tibia_lateral_joint"], metrics["tibia_medial_joint"], (0, 255, 0), 2)
 
-    # anatomical axes — least-squares fit through 4 farthest-from-joint lateral/medial midpoints,
-    # extended from those midpoints down/up to just past the joint reference (notch / intercondylar mid).
+    # anatomical axes — least-squares fit through the 3 farthest-from-joint midpoints
+    # (extreme chain endpoint dropped), extended from those midpoints down/up to just
+    # past the joint reference (notch / intercondylar mid).
     for lat_chain, med_chain, ref_point, take_top, axis_color in [
         (F_LAT_CHAIN, F_MED_CHAIN, metrics["femur_notch"],            True,  (170, 90, 170)),  # muted purple
         (T_LAT_CHAIN, T_MED_CHAIN, metrics["tibia_intercondylar_mid"], False, (90, 170, 170)),  # muted teal
     ]:
-        midpoints = _chain_midpoints(lat_chain, med_chain, coords)
-        midpoints.sort(key=lambda p: p[1])  # ascending y (top of image first)
-        chosen = midpoints[:4] if take_top else midpoints[-4:]
-        for m in chosen:
+        (vx, vy), (x0, y0), fit_points = _anatomical_axis(coords, lat_chain, med_chain, take_top)
+        for m in fit_points:
             dot(m, axis_color, r=2)
-        if len(chosen) >= 2:
-            vx, vy, x0, y0 = _fit_anatomical_axis(chosen)
-            def proj(p): return (p[0] - x0) * vx + (p[1] - y0) * vy
-            t_mids = [proj(m) for m in chosen]
-            t_ref  = proj(ref_point)
-            t_mean = sum(t_mids) / len(t_mids)
-            direction = 1.0 if t_ref >= t_mean else -1.0
-            t_far = min(t_mids) if direction > 0 else max(t_mids)
-            overshoot = abs(t_ref - t_mean) * 0.08
-            t1 = t_far
-            t2 = t_ref + direction * overshoot
-            p1 = (x0 + vx * t1, y0 + vy * t1)
-            p2 = (x0 + vx * t2, y0 + vy * t2)
-            line(p1, p2, axis_color, 1)
+        def proj(p): return (p[0] - x0) * vx + (p[1] - y0) * vy
+        t_mids = [proj(m) for m in fit_points]
+        t_ref  = proj(ref_point)
+        t_mean = sum(t_mids) / len(t_mids)
+        direction = 1.0 if t_ref >= t_mean else -1.0
+        t_far = min(t_mids) if direction > 0 else max(t_mids)
+        overshoot = abs(t_ref - t_mean) * 0.08
+        t1 = t_far
+        t2 = t_ref + direction * overshoot
+        p1 = (x0 + vx * t1, y0 + vy * t1)
+        p2 = (x0 + vx * t2, y0 + vy * t2)
+        line(p1, p2, axis_color, 1)
 
-    # JLCA label near tibia joint mid
-    # label_pos = (metrics["tibia_joint_mid"][0] + 8, metrics["tibia_joint_mid"][1])
-    # text(f"JLCA {metrics['jlca']:.2f}", label_pos, (0, 255, 255))
+    # angle labels — stacked top-left legend, always clamped inside the image
+    labels = [
+        (f"aLDFA {metrics['aldfa']:.1f}", (0, 255, 255)),
+        (f"aMPTA {metrics['ampta']:.1f}", (0, 255, 255)),
+        (f"FTA {metrics['femorotibial_angle']:.1f}", (0, 255, 0)),
+        (f"JLCA {metrics['jlca']:.1f}", (255, 180, 0)),
+    ]
+    for i, (s, c) in enumerate(labels):
+        _draw_label(vis, s, (4, 16 + i * 16), c)
 
     return vis
 
@@ -279,12 +351,16 @@ def infer_single_image(onnx_path, image_path, output_path="output.jpg"):
     return heatmap, offset, coords
 
 
+ANGLE_KEYS = ("aldfa", "ampta", "femorotibial_angle", "jlca")
+
+
 def infer_images(
     onnx_path,
     input_folder,
     output_folder,
     inference_json_name="inference_results.json",
     metrics_json_name="kneeap_metrics.json",
+    angles_json_name="kneeap_angles.json",
     landmarks=False,
 ):
     session = ort.InferenceSession(
@@ -298,6 +374,7 @@ def infer_images(
 
     all_results = {}
     all_metrics = {}
+    all_angles = {}
 
     for path in image_paths:
         img = cv2.imread(path)
@@ -314,6 +391,7 @@ def infer_images(
             for i, (x, y, c) in enumerate(coords)
         ]
         all_metrics[name] = metrics
+        all_angles[name] = {k: float(metrics[k]) for k in ANGLE_KEYS}
 
         result_img = (visualize_predictions(img, coords, threshold=0.0)
                       if landmarks else draw_lines(img, metrics, coords))
@@ -324,5 +402,7 @@ def infer_images(
         json.dump(all_results, f)
     with open(os.path.join(output_folder, metrics_json_name), 'w') as f:
         json.dump(all_metrics, f)
+    with open(os.path.join(output_folder, angles_json_name), 'w') as f:
+        json.dump(all_angles, f, indent=2)
 
     print(f"Finished. Saved to: {output_folder}")

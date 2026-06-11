@@ -67,10 +67,10 @@ def calculate_vector_angle(v1: Point, v2: Point) -> float:
         
     val = dot_product / (mag1 * mag2)
     val = max(-1.0, min(1.0, val))
-    
-    angle_deg = math.degrees(math.acos(val))
-    
-    return angle_deg if angle_deg <= 90.0 else 180.0 - angle_deg
+
+    # Gerçek (yönlü) açı: 0-180 arası ham acos değeri.
+    # Klinik LDFA/MPTA 90'ı geçebildiği için açıyı dar açıya KATLAMIYORUZ.
+    return math.degrees(math.acos(val))
 
 
 def compute_orthopedic_metrics(coords: List[Point]) -> OrthopedicMetrics:
@@ -138,7 +138,10 @@ def compute_orthopedic_metrics(coords: List[Point]) -> OrthopedicMetrics:
     femur_mech_angle_notch = calculate_vector_angle(femur_mech_vec_notch, femur_joint_vec)
 
     # tibia angles
-    tibia_mech_vec_inter = (tibia_intercondiler[0] - final_ankle_middle[0], tibia_intercondiler[1] - final_ankle_middle[1])
+    # Tibia mekanik ekseni yukarı bakar (ankle -> intercondylar); femurun tersi
+    # yönde olduğu için MPTA'yı doğrudan elde etmek üzere vektörü ankle'dan
+    # intercondylar'a doğru (final_ankle_middle - intercondiler) tanımlıyoruz.
+    tibia_mech_vec_inter = (final_ankle_middle[0] - tibia_intercondiler[0], final_ankle_middle[1] - tibia_intercondiler[1])
     tibia_joint_vec = (tibia_medial[0] - tibia_lateral[0], tibia_medial[1] - tibia_lateral[1])
     tibia_mech_angle_inter = calculate_vector_angle(tibia_mech_vec_inter, tibia_joint_vec)
 
@@ -435,11 +438,24 @@ def infer_images(
         cv2.imwrite(os.path.join(output_folder, img_name), result_img)
         print(f"Processed: {img_name}")
 
-    with open(os.path.join(output_folder, inference_json_name), 'w') as f:
-        json.dump(all_results, f)
+    def merge_and_save(json_name, new_data, label):
+        path = os.path.join(output_folder, json_name)
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                existing = json.load(f)
+            overlap = set(existing) & set(new_data)
+            existing.update(new_data)
+            merged = existing
+            print(f"  {label}: merged into existing {json_name} "
+                  f"({len(new_data)} new, {len(overlap)} overwritten, {len(merged)} total)")
+        else:
+            merged = new_data
+            print(f"  {label}: created {json_name} ({len(merged)} entries)")
+        with open(path, 'w') as f:
+            json.dump(merged, f)
 
-    with open(os.path.join(output_folder, metrics_json_name), 'w') as f:
-        json.dump(all_metrics, f)
+    merge_and_save(inference_json_name, all_results, "inference")
+    merge_and_save(metrics_json_name, all_metrics, "metrics")
 
     print(f"Finished. Saved to: {output_folder}")
 
