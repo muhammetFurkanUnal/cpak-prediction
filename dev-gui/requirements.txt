@@ -1,0 +1,5 @@
+# dev-gui bağımlılıkları (hafif). fastapi/uvicorn projede zaten var;
+# tek yeni paket pywebview (işletim sisteminin yerleşik web görüntüleyicisini kullanır).
+fastapi
+uvicorn
+pywebview
