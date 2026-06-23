@@ -27,6 +27,15 @@ notebooks/out/models/*
 notebooks/models/*
 !notebooks/models/.gitkeep
 
+exp/*/out/eval/*
+!exp/*/out/eval/.gitkeep
+
+exp/*/out/models/*
+!exp/*/out/models/.gitkeep
+
+exp/*/out/inference/*
+!exp/*/out/inference/.gitkeep
+
 data/*
 !data/.gitkeep
 
